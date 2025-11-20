@@ -1,0 +1,175 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block content %}
+
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <!-- Offer Information Card -->
+            <div class="card my-4">
+                <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+                    <div class="bg-gradient-primary shadow-primary border-radius-lg pt-4 pb-3">
+                        <div class="d-flex justify-content-between align-items-center px-4">
+                            <h6 class="text-white text-capitalize ps-3">Offer Details</h6>
+                            <div class="d-flex gap-2">
+                                {% if user.is_authenticated %}
+                                <a href="{% url 'offers:edit' offer.pk %}" class="btn btn-light btn-sm mb-0">
+                                    <i class="fas fa-edit me-2"></i>Edit
+                                </a>
+                                {% endif %}
+                                <a href="{% url 'offers:list' %}" class="btn btn-light btn-sm mb-0">
+                                    <i class="fas fa-arrow-left me-2"></i>Back to Offers
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body px-4 pb-2">
+                    <div class="row mt-3">
+                        <div class="col-md-6 mb-3">
+                            <h6 class="text-uppercase text-secondary text-xs font-weight-bolder">Title</h6>
+                            <p class="text-sm mb-0">{{ offer.title }}</p>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <h6 class="text-uppercase text-secondary text-xs font-weight-bolder">Status</h6>
+                            {% if offer.is_active %}
+                            <span class="badge badge-sm bg-gradient-success">Active</span>
+                            {% else %}
+                            <span class="badge badge-sm bg-gradient-secondary">Inactive</span>
+                            {% endif %}
+                        </div>
+                        
+                        {% if offer.description %}
+                        <div class="col-md-12 mb-3">
+                            <h6 class="text-uppercase text-secondary text-xs font-weight-bolder">Description</h6>
+                            <p class="text-sm mb-0">{{ offer.description }}</p>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="col-md-3 mb-3">
+                            <h6 class="text-uppercase text-secondary text-xs font-weight-bolder">Price</h6>
+                            <p class="text-sm mb-0">
+                                {% if offer.price %}${{ offer.price }}{% else %}<span class="text-muted">N/A</span>{% endif %}
+                            </p>
+                        </div>
+                        
+                        <div class="col-md-3 mb-3">
+                            <h6 class="text-uppercase text-secondary text-xs font-weight-bolder">Discount</h6>
+                            <p class="text-sm mb-0">
+                                {% if offer.discount_percentage %}{{ offer.discount_percentage }}%{% else %}<span class="text-muted">N/A</span>{% endif %}
+                            </p>
+                        </div>
+                        
+                        <div class="col-md-3 mb-3">
+                            <h6 class="text-uppercase text-secondary text-xs font-weight-bolder">Start Date</h6>
+                            <p class="text-sm mb-0">
+                                {% if offer.start_date %}{{ offer.start_date|date:"M d, Y" }}{% else %}<span class="text-muted">N/A</span>{% endif %}
+                            </p>
+                        </div>
+                        
+                        <div class="col-md-3 mb-3">
+                            <h6 class="text-uppercase text-secondary text-xs font-weight-bolder">End Date</h6>
+                            <p class="text-sm mb-0">
+                                {% if offer.end_date %}{{ offer.end_date|date:"M d, Y" }}{% else %}<span class="text-muted">N/A</span>{% endif %}
+                            </p>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <h6 class="text-uppercase text-secondary text-xs font-weight-bolder">Created By</h6>
+                            <p class="text-sm mb-0">
+                                {% if offer.created_by %}{{ offer.created_by.get_full_name|default:offer.created_by.username }}{% else %}<span class="text-muted">N/A</span>{% endif %}
+                            </p>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <h6 class="text-uppercase text-secondary text-xs font-weight-bolder">Created At</h6>
+                            <p class="text-sm mb-0">{{ offer.created_at|date:"M d, Y H:i" }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Elements List Card -->
+            <div class="card my-4">
+                <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+                    <div class="bg-gradient-info shadow-primary border-radius-lg pt-4 pb-3">
+                        <h6 class="text-white text-capitalize ps-3">Elements ({{ elements.count }})</h6>
+                    </div>
+                </div>
+                <div class="card-body px-0 pb-2">
+                    {% if elements %}
+                        <div class="table-responsive p-0">
+                            <table class="table align-items-center mb-0">
+                                <thead>
+                                    <tr>
+                                        <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Element Type</th>
+                                        <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Sub Type Code</th>
+                                        <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Sub Type Name</th>
+                                        <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Dimensions</th>
+                                        <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Quantity</th>
+                                        <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Image</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for element in elements %}
+                                    <tr>
+                                        <td>
+                                            <div class="d-flex px-2 py-1">
+                                                <div class="d-flex flex-column justify-content-center">
+                                                    <h6 class="mb-0 text-sm">{{ element.get_element_type_display }}</h6>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <p class="text-xs font-weight-bold mb-0">{{ element.sub_type.code }}</p>
+                                        </td>
+                                        <td>
+                                            <p class="text-xs mb-0">
+                                                {% if element.sub_type.name %}{{ element.sub_type.name }}{% else %}<span class="text-muted">-</span>{% endif %}
+                                            </p>
+                                        </td>
+                                        <td class="align-middle text-center text-sm">
+                                            {% if element.sub_type.Dx or element.sub_type.Dy or element.sub_type.Dz %}
+                                            <span class="text-xs">
+                                                {% if element.sub_type.Dx %}Dx: {{ element.sub_type.Dx }}{% endif %}
+                                                {% if element.sub_type.Dy %} Dy: {{ element.sub_type.Dy }}{% endif %}
+                                                {% if element.sub_type.Dz %} Dz: {{ element.sub_type.Dz }}{% endif %}
+                                            </span>
+                                            {% else %}
+                                            <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="align-middle text-center">
+                                            <span class="badge badge-sm bg-gradient-primary">{{ element.quantity }}</span>
+                                        </td>
+                                        <td class="align-middle text-center">
+                                            {% if element.sub_type.image %}
+                                            <img src="{{ element.sub_type.image.url }}" alt="{{ element.sub_type.code }}" class="img-thumbnail" style="max-width: 80px; max-height: 80px;">
+                                            {% else %}
+                                            <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <p class="text-muted">No elements added to this offer yet.</p>
+                            {% if user.is_authenticated %}
+                            <a href="{% url 'offers:edit' offer.pk %}" class="btn btn-primary btn-sm">
+                                <i class="fas fa-plus me-2"></i>Add Elements
+                            </a>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock content %}
+

@@ -1,0 +1,170 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block content %}
+
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card my-4">
+                <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+                    <div class="bg-gradient-primary shadow-primary border-radius-lg pt-4 pb-3">
+                        <div class="d-flex justify-content-between align-items-center px-4">
+                            <h6 class="text-white text-capitalize ps-3">Offers</h6>
+                            <a href="{% url 'offers:create' %}" class="btn btn-light btn-sm mb-0">
+                                <i class="fas fa-plus me-2"></i>Add New Offer
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body px-0 pb-2">
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show mx-4 mt-3" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    {% if offers %}
+                        <div class="table-responsive p-0">
+                            <table class="table align-items-center mb-0">
+                                <thead>
+                                    <tr>
+                                        <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Title</th>
+                                        <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">Price</th>
+                                        <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Discount</th>
+                                        <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Start Date</th>
+                                        <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">End Date</th>
+                                        <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Status</th>
+                                        <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Created</th>
+                                        {% if user.is_authenticated %}
+                                        <th class="text-secondary opacity-7"></th>
+                                        {% endif %}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for offer in offers %}
+                                    <tr>
+                                        <td>
+                                            <div class="d-flex px-2 py-1">
+                                                <div class="d-flex flex-column justify-content-center">
+                                                    <h6 class="mb-0 text-sm">
+                                                        <a href="{% url 'offers:detail' offer.pk %}" class="text-dark">{{ offer.title }}</a>
+                                                    </h6>
+                                                    {% if offer.description %}
+                                                    <p class="text-xs text-secondary mb-0">{{ offer.description|truncatewords:10 }}</p>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <p class="text-xs font-weight-bold mb-0">
+                                                {% if offer.price %}${{ offer.price }}{% else %}N/A{% endif %}
+                                            </p>
+                                        </td>
+                                        <td class="align-middle text-center text-sm">
+                                            {% if offer.discount_percentage %}
+                                            <span class="badge badge-sm bg-gradient-success">{{ offer.discount_percentage }}%</span>
+                                            {% else %}
+                                            <span class="text-secondary">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="align-middle text-center">
+                                            <span class="text-secondary text-xs font-weight-bold">
+                                                {% if offer.start_date %}{{ offer.start_date|date:"M d, Y" }}{% else %}N/A{% endif %}
+                                            </span>
+                                        </td>
+                                        <td class="align-middle text-center">
+                                            <span class="text-secondary text-xs font-weight-bold">
+                                                {% if offer.end_date %}{{ offer.end_date|date:"M d, Y" }}{% else %}N/A{% endif %}
+                                            </span>
+                                        </td>
+                                        <td class="align-middle text-center text-sm">
+                                            {% if offer.is_active %}
+                                            <span class="badge badge-sm bg-gradient-success">Active</span>
+                                            {% else %}
+                                            <span class="badge badge-sm bg-gradient-secondary">Inactive</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="align-middle text-center">
+                                            <span class="text-secondary text-xs font-weight-bold">{{ offer.created_at|date:"M d, Y" }}</span>
+                                        </td>
+                                        {% if user.is_authenticated %}
+                                        <td class="align-middle">
+                                            <div class="d-flex gap-2 justify-content-center">
+                                                <a href="{% url 'offers:detail' offer.pk %}" class="btn btn-info btn-sm mb-0" data-toggle="tooltip" data-original-title="View details">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                <a href="{% url 'offers:edit' offer.pk %}" class="btn btn-primary btn-sm mb-0" data-toggle="tooltip" data-original-title="Edit offer">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                                <a href="{% url 'offers:delete' offer.pk %}" class="btn btn-danger btn-sm mb-0" data-toggle="tooltip" data-original-title="Delete offer">
+                                                    <i class="fas fa-trash"></i>
+                                                </a>
+                                            </div>
+                                        </td>
+                                        {% else %}
+                                        <td class="align-middle">
+                                            <a href="{% url 'offers:detail' offer.pk %}" class="btn btn-info btn-sm mb-0" data-toggle="tooltip" data-original-title="View details">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                        </td>
+                                        {% endif %}
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Pagination -->
+                        {% if offers.has_other_pages %}
+                        <div class="d-flex justify-content-center mt-4">
+                            <nav aria-label="Page navigation">
+                                <ul class="pagination">
+                                    {% if offers.has_previous %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ offers.previous_page_number }}" aria-label="Previous">
+                                            <span aria-hidden="true">&laquo;</span>
+                                        </a>
+                                    </li>
+                                    {% endif %}
+                                    
+                                    {% for num in offers.paginator.page_range %}
+                                        {% if offers.number == num %}
+                                        <li class="page-item active">
+                                            <span class="page-link">{{ num }}</span>
+                                        </li>
+                                        {% elif num > offers.number|add:'-3' and num < offers.number|add:'3' %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                                        </li>
+                                        {% endif %}
+                                    {% endfor %}
+                                    
+                                    {% if offers.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ offers.next_page_number }}" aria-label="Next">
+                                            <span aria-hidden="true">&raquo;</span>
+                                        </a>
+                                    </li>
+                                    {% endif %}
+                                </ul>
+                            </nav>
+                        </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="text-center py-5">
+                            <p class="text-muted">No offers available. <a href="{% url 'offers:create' %}">Create your first offer</a></p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock content %}
+
+
