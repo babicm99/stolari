@@ -3,7 +3,8 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.http import JsonResponse
-from .models import Offer, Element, ElementSubType
+from django.db import transaction
+from .models import Offer, Element, ElementSubType, ElementSubTypeElements, CoefficientGroup, Coefficient, OfferCoefficientSelection
 from .forms import OfferForm, ElementFormSet
 
 
@@ -87,6 +88,7 @@ def offer_edit(request, pk):
         'formset': formset,
         'offer': offer,
         'action': 'Edit',
+        'current_offer_id': pk,  # Pass directly to template
     }
     
     return render(request, 'pages/apps/offer_form.html', context)
@@ -102,6 +104,7 @@ def offer_detail(request, pk):
         'parent': 'apps',
         'offer': offer,
         'elements': elements,
+        'current_offer_id': pk,  # Pass directly to template
     }
     
     return render(request, 'pages/apps/offer_detail.html', context)
@@ -132,5 +135,69 @@ def get_subtypes(request):
         subtypes = ElementSubType.objects.filter(type=element_type).values('id', 'code', 'name')
         return JsonResponse(list(subtypes), safe=False)
     return JsonResponse([], safe=False)
+
+
+def get_subtype_elements(request):
+    """AJAX endpoint to get ElementSubTypeElements based on ElementSubType ID"""
+    sub_type_id = request.GET.get('sub_type_id')
+    if sub_type_id:
+        try:
+            elements = ElementSubTypeElements.objects.filter(element_sub_type_id=sub_type_id).values(
+                'id', 'element_name', 'element_quantity', 'Dx', 'Dy', 'Dz'
+            )
+            return JsonResponse(list(elements), safe=False)
+        except (ValueError, TypeError):
+            return JsonResponse([], safe=False)
+    return JsonResponse([], safe=False)
+
+
+@login_required(login_url='/accounts/login/basic-login/')
+def update_coefficient(request):
+    """Update coefficient selection via AJAX - only one coefficient per group can be selected per offer"""
+    if request.method == 'POST' and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        try:
+            offer_id = request.POST.get('offer_id')
+            coefficient_id = request.POST.get('coefficient_id')
+            group_id = request.POST.get('group_id')
+            
+            if not offer_id or not coefficient_id or not group_id:
+                return JsonResponse({'success': False, 'error': 'Missing offer_id, coefficient_id or group_id'}, status=400)
+            
+            # Get the offer, coefficient and group
+            offer = get_object_or_404(Offer, id=offer_id)
+            coefficient = get_object_or_404(Coefficient, id=coefficient_id)
+            group = get_object_or_404(CoefficientGroup, id=group_id)
+            
+            # Verify coefficient belongs to the group
+            if coefficient.group != group:
+                return JsonResponse({'success': False, 'error': 'Coefficient does not belong to the specified group'}, status=400)
+            
+            with transaction.atomic():
+                # Remove any existing selection for this group and offer
+                OfferCoefficientSelection.objects.filter(offer=offer, group=group).delete()
+                
+                # Create new selection
+                selection, created = OfferCoefficientSelection.objects.get_or_create(
+                    offer=offer,
+                    group=group,
+                    defaults={'coefficient': coefficient}
+                )
+                
+                if not created:
+                    selection.coefficient = coefficient
+                    selection.save()
+            
+            return JsonResponse({
+                'success': True,
+                'coefficient_id': coefficient.id,
+                'coefficient_name': coefficient.name,
+                'group_id': group.id,
+                'offer_id': offer.id
+            })
+            
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    
+    return JsonResponse({'success': False, 'error': 'Invalid request'}, status=400)
 
 

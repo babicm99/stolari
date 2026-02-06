@@ -34,6 +34,5 @@ class Profile(models.Model):
     bio       = QuillField(default=convert_to_quill())
     dark_mode = models.BooleanField(default=False)
 
-
     def __str__(self):
         return self.user.username

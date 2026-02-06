@@ -73,3 +73,79 @@ class Element(models.Model):
 
     def __str__(self):
         return f"{self.element_type} - {self.sub_type.code} ({self.offer.title})"
+
+# ElementSubTypeElements is a model that will be used to store the elements of the sub type
+class ElementSubTypeElements(models.Model):
+    element_name = models.CharField(max_length=255, verbose_name=_('Element Name'))
+    element_sub_type = models.ForeignKey(ElementSubType, on_delete=models.CASCADE, verbose_name=_('Element Sub Type'))
+    element_quantity = models.IntegerField(verbose_name=_('Element Quantity'))
+    element_price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_('Element Price'))
+    element_discount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_('Element Discount'))
+    element_total_price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_('Element Total'))
+
+    Dx = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    Dy = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    Dz = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+
+    class Meta:
+        verbose_name = _('ElementSubTypeElements')
+        verbose_name_plural = _('ElementSubTypeElements')
+
+    def __str__(self):
+        return self.element_name
+
+
+class CoefficientGroup(models.Model):
+    name = models.CharField(max_length=100)
+    code = models.CharField(max_length=50, unique=True)
+
+    class Meta:
+        verbose_name = "Coefficient Group"
+        verbose_name_plural = "Coefficient Groups"
+
+    def __str__(self):
+        return self.name
+
+
+class Coefficient(models.Model):
+    group = models.ForeignKey(
+        CoefficientGroup,
+        on_delete=models.CASCADE,
+        related_name="coefficients"
+    )
+    name = models.CharField(max_length=100)
+    code = models.CharField(max_length=50)
+    value = models.PositiveSmallIntegerField(default=1)  # active = 1
+
+    class Meta:
+        unique_together = ("group", "code")
+        verbose_name = "Coefficient"
+        verbose_name_plural = "Coefficients"
+
+    def __str__(self):
+        return f"{self.group.name} – {self.name}"
+
+
+class OfferCoefficientSelection(models.Model):
+    offer = models.ForeignKey(
+        Offer,
+        on_delete=models.CASCADE,
+        related_name="coefficient_selections"
+    )
+    group = models.ForeignKey(
+        CoefficientGroup,
+        on_delete=models.CASCADE
+    )
+    coefficient = models.ForeignKey(
+        Coefficient,
+        on_delete=models.CASCADE
+    )
+
+    class Meta:
+        unique_together = ("offer", "group")
+        verbose_name = "Offer Coefficient Selection"
+        verbose_name_plural = "Offer Coefficient Selections"
+
+    def __str__(self):
+        return f"{self.offer} → {self.coefficient}"
+    

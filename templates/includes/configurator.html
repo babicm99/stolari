@@ -18,7 +18,7 @@
         <!-- End Toggle Button -->
       </div>
       <hr class="horizontal dark my-1">
-      <div class="card-body pt-sm-3 pt-0">
+      <div class="card-body pt-sm-3 pt-0" style="overflow-y: auto; max-height: calc(100vh - 120px);">
         <!-- Sidebar Backgrounds -->
         <div>
           <h6 class="mb-0">Sidebar Colors</h6>
@@ -62,12 +62,46 @@
           <h6 class="mb-0">Light/Dark</h6>
         </div>
         <div class="form-check form-switch ps-0 d-xl-block d-none">
-          <input class="form-check-input mt-1 ms-auto" type="checkbox" id="dark-version" onclick="darkMode(this)">
+          <input class="form-check-input mt-1 ms-auto" type="checkbox" id="dark-version" onclick="darkMode(this)" {% if user.is_authenticated and user.profile.dark_mode %}checked{% endif %}>
         </div>
+        {% if user.is_authenticated and coefficient_groups %}
         <hr class="horizontal dark my-sm-4">
-        <a class="btn bg-gradient-info w-100" href="https://app-generator.dev/product/soft-ui-dashboard-pro/django/">Download</a>
-        <a class="btn bg-gradient-dark w-100" href="https://app-generator.dev/product/soft-ui-dashboard/django/">Free demo</a>
-        <a class="btn btn-outline-dark w-100" href="https://app-generator.dev/docs/products/django/soft-ui-dashboard-pro/index.html">View documentation</a>
-      </div>
+        <!-- Coefficient Settings -->
+        <div class="mt-3">
+          <h6 class="mb-0">Coefficient Settings</h6>
+          <p class="text-sm">Select one coefficient per group for current offer.</p>
+          {% if not current_offer_id %}
+          <p class="text-xs text-warning mb-0">⚠️ Please open an offer to configure coefficients.</p>
+          {% endif %}
+        </div>
+        <!-- Offer ID will be read from body data attribute by JavaScript -->
+        {% for group in coefficient_groups %}
+        <!-- Coefficient Group: {{ group.name }} -->
+        <div class="mt-3">
+          <h6 class="mb-1 text-sm">{{ group.name }}</h6>
+          <div class="coefficient-group" data-group-id="{{ group.id }}">
+            {% for coeff in group.coefficients %}
+            <div class="form-check form-check-radio mb-2">
+              <input 
+                class="form-check-input coefficient-radio" 
+                type="radio" 
+                name="coefficient_group_{{ group.id }}" 
+                id="coeff_{{ coeff.id }}" 
+                value="{{ coeff.id }}"
+                data-group-id="{{ group.id }}"
+                data-coefficient-id="{{ coeff.id }}"
+                {% if coeff.selected %}checked{% endif %}
+                {% if not current_offer_id %}disabled{% endif %}>
+              <label class="form-check-label text-xs" for="coeff_{{ coeff.id }}">
+                <span class="font-weight-bold">{{ coeff.name }}</span>
+                <span class="text-muted">({{ coeff.code }})</span>
+              </label>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+        </div>
     </div>
 </div>

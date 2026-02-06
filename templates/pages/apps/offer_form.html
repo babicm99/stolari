@@ -163,6 +163,31 @@
                                                 {% if form.sub_type.errors %}
                                                     <div class="text-danger small">{{ form.sub_type.errors }}</div>
                                                 {% endif %}
+                                                <!-- ElementSubTypeElements display area -->
+                                                <div class="subtype-elements-container mt-3" style="display: none;">
+                                                    <div class="card">
+                                                        <div class="card-header bg-light">
+                                                            <h6 class="mb-0">Sub Type Elements</h6>
+                                                        </div>
+                                                        <div class="card-body p-2">
+                                                            <div class="table-responsive">
+                                                                <table class="table table-sm table-bordered mb-0">
+                                                                    <thead>
+                                                                        <tr>
+                                                                            <th>Name</th>
+                                                                            <th>Qty</th>
+                                                                            <th>Dx</th>
+                                                                            <th>Dy</th>
+                                                                            <th>Dz</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody class="subtype-elements-tbody">
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
                                             
                                             <div class="col-md-4 mb-3">
@@ -217,6 +242,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const elementType = elementTypeSelect.value;
         if (!elementType) {
             subTypeSelect.innerHTML = '<option value="">---------</option>';
+            // Hide elements container when element type is cleared
+            const formRow = elementTypeSelect.closest('.element-form-row');
+            const elementsContainer = formRow.querySelector('.subtype-elements-container');
+            if (elementsContainer) {
+                elementsContainer.style.display = 'none';
+            }
             return;
         }
         
@@ -230,8 +261,102 @@ document.addEventListener('DOMContentLoaded', function() {
                     option.textContent = `${subtype.code}${subtype.name ? ' - ' + subtype.name : ''}`;
                     subTypeSelect.appendChild(option);
                 });
+                // Clear elements display when subtypes change
+                const formRow = elementTypeSelect.closest('.element-form-row');
+                const elementsContainer = formRow.querySelector('.subtype-elements-container');
+                if (elementsContainer) {
+                    elementsContainer.style.display = 'none';
+                }
             })
             .catch(error => console.error('Error:', error));
+    }
+    
+    // Get and display ElementSubTypeElements
+    function updateSubtypeElements(subTypeSelect) {
+        const subTypeId = subTypeSelect.value;
+        const formRow = subTypeSelect.closest('.element-form-row');
+        const elementsContainer = formRow.querySelector('.subtype-elements-container');
+        const elementsTbody = formRow.querySelector('.subtype-elements-tbody');
+        
+        if (!subTypeId || !elementsContainer || !elementsTbody) {
+            if (elementsContainer) {
+                elementsContainer.style.display = 'none';
+            }
+            return;
+        }
+        
+        fetch(`{% url 'offers:get_subtype_elements' %}?sub_type_id=${subTypeId}`)
+            .then(response => response.json())
+            .then(data => {
+                elementsTbody.innerHTML = '';
+                
+                if (data.length === 0) {
+                    elementsContainer.style.display = 'none';
+                    return;
+                }
+                
+                elementsContainer.style.display = 'block';
+                
+                data.forEach((element, index) => {
+                    const row = document.createElement('tr');
+                    // Get form index from the form row to create unique input names
+                    const formRow = subTypeSelect.closest('.element-form-row');
+                    const formIndex = formRow ? formRow.getAttribute('data-form-index') : '0';
+                    
+                    // Create unique IDs for inputs
+                    const qtyId = `element_${formIndex}_${element.id}_Qty`;
+                    const dxId = `element_${formIndex}_${element.id}_Dx`;
+                    const dyId = `element_${formIndex}_${element.id}_Dy`;
+                    const dzId = `element_${formIndex}_${element.id}_Dz`;
+                    
+                    row.innerHTML = `
+                        <td>${element.element_name || '-'}</td>
+                        <td>
+                            <input type="number" 
+                                   class="form-control form-control-sm" 
+                                   id="${qtyId}"
+                                   name="subtype_elements[${formIndex}][${element.id}][quantity]"
+                                   value="${element.element_quantity || ''}" 
+                                   min="1"
+                                   placeholder="Qty">
+                        </td>
+                        <td>
+                            <input type="number" 
+                                   class="form-control form-control-sm" 
+                                   id="${dxId}"
+                                   name="subtype_elements[${formIndex}][${element.id}][Dx]"
+                                   value="${element.Dx || ''}" 
+                                   step="0.01"
+                                   placeholder="Dx">
+                        </td>
+                        <td>
+                            <input type="number" 
+                                   class="form-control form-control-sm" 
+                                   id="${dyId}"
+                                   name="subtype_elements[${formIndex}][${element.id}][Dy]"
+                                   value="${element.Dy || ''}" 
+                                   step="0.01"
+                                   placeholder="Dy">
+                        </td>
+                        <td>
+                            <input type="number" 
+                                   class="form-control form-control-sm" 
+                                   id="${dzId}"
+                                   name="subtype_elements[${formIndex}][${element.id}][Dz]"
+                                   value="${element.Dz || ''}" 
+                                   step="0.01"
+                                   placeholder="Dz">
+                        </td>
+                    `;
+                    elementsTbody.appendChild(row);
+                });
+            })
+            .catch(error => {
+                console.error('Error fetching subtype elements:', error);
+                if (elementsContainer) {
+                    elementsContainer.style.display = 'none';
+                }
+            });
     }
     
     // Initialize subtype updates for existing forms
@@ -242,6 +367,18 @@ document.addEventListener('DOMContentLoaded', function() {
         select.addEventListener('change', function() {
             updateSubtypes(this, subTypeSelect);
         });
+        
+        // Add event listener for sub_type changes to show ElementSubTypeElements
+        if (subTypeSelect) {
+            subTypeSelect.addEventListener('change', function() {
+                updateSubtypeElements(this);
+            });
+            
+            // If sub_type already has a value (editing existing form), load elements
+            if (subTypeSelect.value) {
+                updateSubtypeElements(subTypeSelect);
+            }
+        }
     });
     
     // Add new element form
@@ -271,6 +408,31 @@ document.addEventListener('DOMContentLoaded', function() {
                             <select name="elements-${formCount}-sub_type" class="form-control element-subtype-select" id="id_elements-${formCount}-sub_type" required>
                                 <option value="">---------</option>
                             </select>
+                            <!-- ElementSubTypeElements display area -->
+                            <div class="subtype-elements-container mt-3" style="display: none;">
+                                <div class="card">
+                                    <div class="card-header bg-light">
+                                        <h6 class="mb-0">Sub Type Elements</h6>
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-bordered mb-0">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Name</th>
+                                                        <th>Qty</th>
+                                                        <th>Dx</th>
+                                                        <th>Dy</th>
+                                                        <th>Dz</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody class="subtype-elements-tbody">
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-md-4 mb-3">
                             <label class="form-label">Quantity <span class="text-danger">*</span></label>
@@ -292,6 +454,11 @@ document.addEventListener('DOMContentLoaded', function() {
         
         newElementTypeSelect.addEventListener('change', function() {
             updateSubtypes(this, newSubTypeSelect);
+        });
+        
+        // Add event listener for sub_type changes to show ElementSubTypeElements
+        newSubTypeSelect.addEventListener('change', function() {
+            updateSubtypeElements(this);
         });
         
         // Add remove button functionality

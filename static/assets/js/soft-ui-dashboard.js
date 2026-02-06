@@ -1051,6 +1051,84 @@ function darkMode(el) {
   }
 };
 
+// Update Coefficient Selection (Radio Button) - for Offers
+function updateCoefficientSelection(el) {
+  const coefficientId = el.getAttribute('data-coefficient-id');
+  const groupId = el.getAttribute('data-group-id');
+  
+  // Get offer_id from body data attribute (set by template)
+  const body = document.body;
+  const offerId = body ? body.getAttribute('data-offer-id') : null;
+  
+  if (!offerId) {
+    console.error('No current offer ID found. Please open an offer first.');
+    el.checked = false;
+    return;
+  }
+  
+  if (!coefficientId || !groupId || !offerId) {
+    console.error('Missing coefficient_id, group_id, or offer_id');
+    el.checked = false;
+    return;
+  }
+  
+  // Get CSRF token from cookies
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+  
+  const csrftoken = getCookie('csrftoken');
+  
+  // Send AJAX request to offers app
+  fetch('/offers/ajax/update-coefficient/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'X-Requested-With': 'XMLHttpRequest',
+      'X-CSRFToken': csrftoken
+    },
+    body: 'offer_id=' + encodeURIComponent(offerId) + '&coefficient_id=' + encodeURIComponent(coefficientId) + '&group_id=' + encodeURIComponent(groupId)
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      console.log('Coefficient selection updated successfully:', data.coefficient_name);
+    } else {
+      console.error('Error updating coefficient selection:', data.error);
+      // Revert the selection if update failed
+      el.checked = false;
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    // Revert the selection if update failed
+    el.checked = false;
+  });
+}
+
+// Initialize coefficient radio buttons
+document.addEventListener('DOMContentLoaded', function() {
+  const coefficientRadios = document.querySelectorAll('.coefficient-radio');
+  coefficientRadios.forEach(function(radioEl) {
+    radioEl.addEventListener('change', function() {
+      if (this.checked) {
+        updateCoefficientSelection(this);
+      }
+    });
+  });
+});
+
 // flatpickr init
 if (document.querySelector('.datepicker')) {
   flatpickr('.datepicker', {

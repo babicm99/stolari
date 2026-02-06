@@ -6,7 +6,7 @@
   {% block extrastyle %}{% endblock extrastyle %}
 </head>
 
-<body class="g-sidenav-show  bg-gray-100">
+<body class="g-sidenav-show  bg-gray-100" {% if current_offer_id %}data-offer-id="{{ current_offer_id }}"{% endif %}>
     {% block sidebar %}
         {% include "includes/sidebar.html" %}
     {% endblock sidebar %}
