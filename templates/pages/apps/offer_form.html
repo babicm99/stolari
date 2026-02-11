@@ -200,6 +200,40 @@
                                                 {% endif %}
                                             </div>
                                         </div>
+                                        
+                                        <!-- Dimensions Section for Element -->
+                                        <div class="row mt-3">
+                                            <div class="col-12">
+                                                <h6 class="mb-3">Dimensions</h6>
+                                            </div>
+                                            <div class="col-md-4 mb-3">
+                                                <label for="{{ form.Dx.id_for_label }}" class="form-label">
+                                                    Dx
+                                                </label>
+                                                {{ form.Dx }}
+                                                {% if form.Dx.errors %}
+                                                    <div class="text-danger small">{{ form.Dx.errors }}</div>
+                                                {% endif %}
+                                            </div>
+                                            <div class="col-md-4 mb-3">
+                                                <label for="{{ form.Dy.id_for_label }}" class="form-label">
+                                                    Dy
+                                                </label>
+                                                {{ form.Dy }}
+                                                {% if form.Dy.errors %}
+                                                    <div class="text-danger small">{{ form.Dy.errors }}</div>
+                                                {% endif %}
+                                            </div>
+                                            <div class="col-md-4 mb-3">
+                                                <label for="{{ form.Dz.id_for_label }}" class="form-label">
+                                                    Dz
+                                                </label>
+                                                {{ form.Dz }}
+                                                {% if form.Dz.errors %}
+                                                    <div class="text-danger small">{{ form.Dz.errors }}</div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                                 {% endfor %}
@@ -255,11 +289,19 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(response => response.json())
             .then(data => {
                 subTypeSelect.innerHTML = '<option value="">---------</option>';
+                // Store subtype data for later use (for auto-filling dimensions)
+                subTypeSelect.subtypeData = {};
                 data.forEach(subtype => {
                     const option = document.createElement('option');
                     option.value = subtype.id;
                     option.textContent = `${subtype.code}${subtype.name ? ' - ' + subtype.name : ''}`;
                     subTypeSelect.appendChild(option);
+                    // Store dimension data
+                    subTypeSelect.subtypeData[subtype.id] = {
+                        Dx: subtype.Dx,
+                        Dy: subtype.Dy,
+                        Dz: subtype.Dz
+                    };
                 });
                 // Clear elements display when subtypes change
                 const formRow = elementTypeSelect.closest('.element-form-row');
@@ -269,6 +311,40 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             })
             .catch(error => console.error('Error:', error));
+    }
+    
+    // Auto-fill dimensions from ElementSubType when sub_type is selected (for Element)
+    function autoFillDimensions(subTypeSelect) {
+        const subTypeId = subTypeSelect.value;
+        const formRow = subTypeSelect.closest('.element-form-row');
+        
+        if (!subTypeId || !formRow || !subTypeSelect.subtypeData) {
+            return;
+        }
+        
+        const subtypeData = subTypeSelect.subtypeData[subTypeId];
+        if (!subtypeData) {
+            return;
+        }
+        
+        // Get form index
+        const formIndex = formRow.getAttribute('data-form-index');
+        
+        // Auto-fill dimensions for Element (Dx, Dy, Dz inputs in the form)
+        const dxInput = formRow.querySelector(`input[name="elements-${formIndex}-Dx"]`);
+        const dyInput = formRow.querySelector(`input[name="elements-${formIndex}-Dy"]`);
+        const dzInput = formRow.querySelector(`input[name="elements-${formIndex}-Dz"]`);
+        
+        // Only auto-fill if fields are empty (don't overwrite user input)
+        if (dxInput && !dxInput.value && subtypeData.Dx) {
+            dxInput.value = subtypeData.Dx;
+        }
+        if (dyInput && !dyInput.value && subtypeData.Dy) {
+            dyInput.value = subtypeData.Dy;
+        }
+        if (dzInput && !dzInput.value && subtypeData.Dz) {
+            dzInput.value = subtypeData.Dz;
+        }
     }
     
     // Get and display ElementSubTypeElements
@@ -321,35 +397,20 @@ document.addEventListener('DOMContentLoaded', function() {
                                    placeholder="Qty">
                         </td>
                         <td>
-                            <input type="number" 
-                                   class="form-control form-control-sm" 
-                                   id="${dxId}"
-                                   name="subtype_elements[${formIndex}][${element.id}][Dx]"
-                                   value="${element.Dx || ''}" 
-                                   step="0.01"
-                                   placeholder="Dx">
+                            <span class="text-sm">${element.Dx || '-'}</span>
                         </td>
                         <td>
-                            <input type="number" 
-                                   class="form-control form-control-sm" 
-                                   id="${dyId}"
-                                   name="subtype_elements[${formIndex}][${element.id}][Dy]"
-                                   value="${element.Dy || ''}" 
-                                   step="0.01"
-                                   placeholder="Dy">
+                            <span class="text-sm">${element.Dy || '-'}</span>
                         </td>
                         <td>
-                            <input type="number" 
-                                   class="form-control form-control-sm" 
-                                   id="${dzId}"
-                                   name="subtype_elements[${formIndex}][${element.id}][Dz]"
-                                   value="${element.Dz || ''}" 
-                                   step="0.01"
-                                   placeholder="Dz">
+                            <span class="text-sm">${element.Dz || '-'}</span>
                         </td>
                     `;
                     elementsTbody.appendChild(row);
                 });
+                
+                // Auto-fill dimensions from ElementSubType for Element after elements are loaded
+                autoFillDimensions(subTypeSelect);
             })
             .catch(error => {
                 console.error('Error fetching subtype elements:', error);
@@ -439,6 +500,24 @@ document.addEventListener('DOMContentLoaded', function() {
                             <input type="number" name="elements-${formCount}-quantity" class="form-control" id="id_elements-${formCount}-quantity" min="1" value="1" required>
                         </div>
                     </div>
+                    <!-- Dimensions Section for Element -->
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <h6 class="mb-3">Dimensions</h6>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Dx</label>
+                            <input type="number" name="elements-${formCount}-Dx" class="form-control" id="id_elements-${formCount}-Dx" step="0.01" placeholder="Dx">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Dy</label>
+                            <input type="number" name="elements-${formCount}-Dy" class="form-control" id="id_elements-${formCount}-Dy" step="0.01" placeholder="Dy">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Dz</label>
+                            <input type="number" name="elements-${formCount}-Dz" class="form-control" id="id_elements-${formCount}-Dz" step="0.01" placeholder="Dz">
+                        </div>
+                    </div>
                 </div>
             </div>
         `;
@@ -456,9 +535,11 @@ document.addEventListener('DOMContentLoaded', function() {
             updateSubtypes(this, newSubTypeSelect);
         });
         
-        // Add event listener for sub_type changes to show ElementSubTypeElements
+        // Add event listener for sub_type changes to show ElementSubTypeElements and auto-fill Element dimensions
         newSubTypeSelect.addEventListener('change', function() {
             updateSubtypeElements(this);
+            // Auto-fill Element dimensions from ElementSubType
+            autoFillDimensions(this);
         });
         
         // Add remove button functionality
@@ -497,6 +578,188 @@ document.addEventListener('DOMContentLoaded', function() {
             span.textContent = index + 1;
         });
     }
+    
+    // Refresh ElementSubTypeElements table for a specific form row
+    // Make it globally accessible
+    window.refreshSubtypeElementsForFormRow = function(formRow, updatedElements) {
+        const elementsTbody = formRow ? formRow.querySelector('.subtype-elements-tbody') : null;
+        if (!elementsTbody) {
+            console.log('No subtype elements tbody found in form row');
+            return;
+        }
+        
+        const rows = elementsTbody.querySelectorAll('tr');
+        console.log(`Refreshing ${rows.length} rows in form row`);
+        
+        rows.forEach((row, rowIndex) => {
+            const qtyInput = row.querySelector('input[type="number"]');
+            if (qtyInput) {
+                const inputName = qtyInput.getAttribute('name');
+                const match = inputName.match(/\[(\d+)\]\[quantity\]/);
+                if (match) {
+                    const elementId = parseInt(match[1]);
+                    const updatedElement = updatedElements.find(e => e.id === elementId);
+                    
+                    if (updatedElement) {
+                        console.log(`Updating element ${elementId} in form row: Dx=${updatedElement.Dx}, Dy=${updatedElement.Dy}, Dz=${updatedElement.Dz}`);
+                        const cells = row.querySelectorAll('td');
+                        if (cells.length >= 5) {
+                            // Dx is in 3rd cell (index 2), Dy in 4th (index 3), Dz in 5th (index 4)
+                            if (cells[2]) {
+                                const dxValue = updatedElement.Dx !== null && updatedElement.Dx !== undefined ? updatedElement.Dx : '-';
+                                cells[2].innerHTML = `<span class="text-sm">${dxValue}</span>`;
+                            }
+                            if (cells[3]) {
+                                const dyValue = updatedElement.Dy !== null && updatedElement.Dy !== undefined ? updatedElement.Dy : '-';
+                                cells[3].innerHTML = `<span class="text-sm">${dyValue}</span>`;
+                            }
+                            if (cells[4]) {
+                                const dzValue = updatedElement.Dz !== null && updatedElement.Dz !== undefined ? updatedElement.Dz : '-';
+                                cells[4].innerHTML = `<span class="text-sm">${dzValue}</span>`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    };
+    
+    // Auto-save Element dimensions (Dx, Dy, Dz) when changed
+    function setupElementDimensionAutoSave() {
+        // Get CSRF token
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+        
+        const csrftoken = getCookie('csrftoken');
+        let saveTimeout = null;
+        
+        // Function to save element dimensions
+        function saveElementDimensions(elementId, dx, dy, dz, formRow) {
+            if (!elementId) {
+                console.log('Element ID not found, skipping auto-save (element not yet saved)');
+                return;
+            }
+            
+            const formData = new URLSearchParams();
+            formData.append('element_id', elementId);
+            if (dx !== null && dx !== '') formData.append('Dx', dx);
+            if (dy !== null && dy !== '') formData.append('Dy', dy);
+            if (dz !== null && dz !== '') formData.append('Dz', dz);
+            
+            fetch('{% url "offers:update_element_dimensions" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': csrftoken
+                },
+                body: formData.toString()
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    console.log('Element dimensions saved successfully:', data);
+                    
+                    // Refresh only the ElementSubTypeElements table for this specific form row
+                    if (data.updated_subtype_elements && data.updated_subtype_elements.length > 0) {
+                        refreshSubtypeElementsForFormRow(formRow, data.updated_subtype_elements);
+                    }
+                } else {
+                    console.error('Error saving element dimensions:', data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error saving element dimensions:', error);
+            });
+        }
+        
+        // Add event listeners to all dimension inputs (existing and new)
+        function attachDimensionListeners() {
+            document.querySelectorAll('input[name*="-Dx"], input[name*="-Dy"], input[name*="-Dz"]').forEach(input => {
+                // Remove existing listener if any
+                const newInput = input.cloneNode(true);
+                input.parentNode.replaceChild(newInput, input);
+                
+                // Add change and blur listeners with debounce
+                newInput.addEventListener('change', function() {
+                    const formRow = this.closest('.element-form-row');
+                    if (!formRow) return;
+                    
+                    // Get element ID from hidden input
+                    const idInput = formRow.querySelector('input[name*="-id"]');
+                    const elementId = idInput ? idInput.value : null;
+                    
+                    // Get all dimension values from this form row
+                    const dxInput = formRow.querySelector('input[name*="-Dx"]');
+                    const dyInput = formRow.querySelector('input[name*="-Dy"]');
+                    const dzInput = formRow.querySelector('input[name*="-Dz"]');
+                    
+                    const dx = dxInput ? dxInput.value : null;
+                    const dy = dyInput ? dyInput.value : null;
+                    const dz = dzInput ? dzInput.value : null;
+                    
+                    // Debounce: clear previous timeout
+                    if (saveTimeout) {
+                        clearTimeout(saveTimeout);
+                    }
+                    
+                    // Save after 500ms of no changes
+                    saveTimeout = setTimeout(() => {
+                        saveElementDimensions(elementId, dx, dy, dz, formRow);
+                    }, 500);
+                });
+                
+                newInput.addEventListener('blur', function() {
+                    // Save immediately on blur
+                    if (saveTimeout) {
+                        clearTimeout(saveTimeout);
+                    }
+                    
+                    const formRow = this.closest('.element-form-row');
+                    if (!formRow) return;
+                    
+                    const idInput = formRow.querySelector('input[name*="-id"]');
+                    const elementId = idInput ? idInput.value : null;
+                    
+                    const dxInput = formRow.querySelector('input[name*="-Dx"]');
+                    const dyInput = formRow.querySelector('input[name*="-Dy"]');
+                    const dzInput = formRow.querySelector('input[name*="-Dz"]');
+                    
+                    const dx = dxInput ? dxInput.value : null;
+                    const dy = dyInput ? dyInput.value : null;
+                    const dz = dzInput ? dzInput.value : null;
+                    
+                    saveElementDimensions(elementId, dx, dy, dz, formRow);
+                });
+            });
+        }
+        
+        // Attach listeners to existing inputs
+        attachDimensionListeners();
+        
+        // Re-attach listeners when new elements are added
+        const originalAddElement = addElementBtn.onclick;
+        addElementBtn.addEventListener('click', function() {
+            setTimeout(() => {
+                attachDimensionListeners();
+            }, 100);
+        });
+    }
+    
+    // Initialize auto-save for element dimensions
+    setupElementDimensionAutoSave();
 });
 </script>
 {% endblock extra_js %}

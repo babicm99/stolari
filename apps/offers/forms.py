@@ -32,11 +32,14 @@ class OfferForm(forms.ModelForm):
 class ElementForm(forms.ModelForm):
     class Meta:
         model = Element
-        fields = ['element_type', 'sub_type', 'quantity']
+        fields = ['element_type', 'sub_type', 'quantity', 'Dx', 'Dy', 'Dz']
         widgets = {
             'element_type': forms.Select(attrs={'class': 'form-control element-type-select'}),
             'sub_type': forms.Select(attrs={'class': 'form-control element-subtype-select'}),
             'quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': '1', 'value': '1'}),
+            'Dx': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': 'Dx'}),
+            'Dy': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': 'Dy'}),
+            'Dz': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': 'Dz'}),
         }
 
     def __init__(self, *args, **kwargs):

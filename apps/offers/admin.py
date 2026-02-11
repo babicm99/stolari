@@ -40,19 +40,32 @@ class ElementSubTypeAdmin(admin.ModelAdmin):
 
 @admin.register(Element)
 class ElementAdmin(admin.ModelAdmin):
-    list_display = ['offer', 'element_type', 'sub_type', 'quantity']
+    list_display = ['offer', 'element_type', 'sub_type', 'quantity', 'Dx', 'Dy', 'Dz']
     list_filter = ['element_type']
     autocomplete_fields = ['sub_type']
+    fieldsets = (
+        (_('Basic Information'), {
+            'fields': ('offer', 'element_type', 'sub_type', 'quantity')
+        }),
+        (_('Dimensions'), {
+            'fields': ('Dx', 'Dy', 'Dz'),
+            'classes': ('collapse',)
+        }),
+    )
 
 
 @admin.register(ElementSubTypeElements)
 class ElementSubTypeElementsAdmin(admin.ModelAdmin):
-    list_display = ['element_name', 'element_sub_type', 'element_quantity', 'element_price', 'element_discount', 'element_total_price']
-    list_filter = ['element_sub_type', 'element_sub_type__type']
-    search_fields = ['element_name', 'element_sub_type__code', 'element_sub_type__name']
+    list_display = ['element_name', 'formula_code', 'element_sub_type', 'element_quantity', 'element_price', 'element_discount', 'element_total_price']
+    list_filter = ['element_sub_type', 'element_sub_type__type', 'formula_code']
+    search_fields = ['element_name', 'element_sub_type__code', 'element_sub_type__name', 'formula_code']
     fieldsets = (
         (_('Basic Information'), {
             'fields': ('element_name', 'element_sub_type', 'element_quantity')
+        }),
+        (_('Formula Configuration'), {
+            'fields': ('formula_code',),
+            'description': _('Optional: Enter a formula code to use a custom calculation formula for this element. Leave blank to use default formulas.')
         }),
         (_('Pricing'), {
             'fields': ('element_price', 'element_discount', 'element_total_price')
@@ -73,10 +86,19 @@ class CoefficientGroupAdmin(admin.ModelAdmin):
 
 @admin.register(Coefficient)
 class CoefficientAdmin(admin.ModelAdmin):
-    list_display = ('name', 'group', 'code', 'value')
-    list_filter = ('group',)
+    list_display = ('name', 'group', 'code', 'value', 'is_default')
+    list_filter = ('group', 'is_default')
     search_fields = ('name', 'code', 'group__name')
     raw_id_fields = ('group',)
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('group', 'name', 'code', 'value')
+        }),
+        ('Default Settings', {
+            'fields': ('is_default',),
+            'description': 'If checked, this coefficient will be automatically selected for new offers. Only one coefficient per group should be marked as default.'
+        }),
+    )
 
 
 @admin.register(OfferCoefficientSelection)

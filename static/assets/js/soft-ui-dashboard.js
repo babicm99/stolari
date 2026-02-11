@@ -1104,6 +1104,43 @@ function updateCoefficientSelection(el) {
   .then(data => {
     if (data.success) {
       console.log('Coefficient selection updated successfully:', data.coefficient_name);
+      console.log('Recalculation result:', data.recalculation);
+      console.log('Updated subtype elements data:', data.updated_subtype_elements);
+      
+      // Refresh all ElementSubTypeElements displays
+      // Data is now grouped by element_id: {element_id: [ElementSubTypeElements...]}
+      if (data.updated_subtype_elements_by_element) {
+        console.log('Updating ElementSubTypeElements for', Object.keys(data.updated_subtype_elements_by_element).length, 'elements');
+        
+        // Update each Element's table separately
+        Object.keys(data.updated_subtype_elements_by_element).forEach(elementId => {
+          const elementData = data.updated_subtype_elements_by_element[elementId];
+          console.log(`Updating Element ${elementId} with ${elementData.length} ElementSubTypeElements`);
+          
+          // Find the form row for this element
+          const elementIdInput = document.querySelector(`input[name*="-id"][value="${elementId}"]`);
+          if (elementIdInput) {
+            const formRow = elementIdInput.closest('.element-form-row');
+            if (formRow) {
+              // Use the refresh function for this specific form row
+              if (typeof refreshSubtypeElementsForFormRow === 'function') {
+                refreshSubtypeElementsForFormRow(formRow, elementData);
+              } else {
+                // Fallback: use the global refresh function
+                refreshSubtypeElementsDisplay(elementData);
+              }
+            }
+          }
+        });
+      } else if (data.updated_subtype_elements && data.updated_subtype_elements.length > 0) {
+        // Fallback for old format
+        console.log('Calling refreshSubtypeElementsDisplay with', data.updated_subtype_elements.length, 'elements');
+        refreshSubtypeElementsDisplay(data.updated_subtype_elements);
+      } else {
+        console.log('No updated_subtype_elements in response, using fallback refresh');
+        // Fallback: refresh all subtype elements tables by re-fetching
+        refreshAllSubtypeElementsTables();
+      }
     } else {
       console.error('Error updating coefficient selection:', data.error);
       // Revert the selection if update failed
@@ -1115,6 +1152,156 @@ function updateCoefficientSelection(el) {
     // Revert the selection if update failed
     el.checked = false;
   });
+}
+
+// Helper function to refresh ElementSubTypeElements display after recalculation
+// Make it globally accessible
+window.refreshSubtypeElementsDisplay = function(updatedElements) {
+  console.log('refreshSubtypeElementsDisplay called with', updatedElements.length, 'elements');
+  
+  // Group elements by element_sub_type_id
+  const elementsBySubType = {};
+  updatedElements.forEach(element => {
+    const subTypeId = element.element_sub_type_id;
+    if (!elementsBySubType[subTypeId]) {
+      elementsBySubType[subTypeId] = [];
+    }
+    elementsBySubType[subTypeId].push(element);
+  });
+  
+  console.log('Grouped elements by sub_type:', Object.keys(elementsBySubType));
+  
+  // Update each subtype elements table
+  const tbodyElements = document.querySelectorAll('.subtype-elements-tbody');
+  console.log('Found', tbodyElements.length, 'subtype elements tbody elements');
+  
+  tbodyElements.forEach((tbody, tbodyIndex) => {
+    const rows = tbody.querySelectorAll('tr');
+    console.log(`Processing tbody ${tbodyIndex}, found ${rows.length} rows`);
+    
+    rows.forEach((row, rowIndex) => {
+      // Try to find the element ID from the row (might be in data attribute or input name)
+      const qtyInput = row.querySelector('input[type="number"]');
+      if (qtyInput) {
+        const inputName = qtyInput.getAttribute('name');
+        const match = inputName.match(/\[(\d+)\]\[quantity\]/);
+        if (match) {
+          const elementId = parseInt(match[1]);
+          console.log(`Row ${rowIndex}: Found element ID ${elementId} from input name ${inputName}`);
+          
+          // Search in all sub_types for this element
+          let updatedElement = null;
+          Object.values(elementsBySubType).forEach(elements => {
+            const found = elements.find(e => e.id === elementId);
+            if (found) {
+              updatedElement = found;
+            }
+          });
+          
+          if (updatedElement) {
+            console.log(`Found updated element ${elementId}: Dx=${updatedElement.Dx}, Dy=${updatedElement.Dy}, Dz=${updatedElement.Dz}`);
+            // Update Dx, Dy, Dz display
+            const cells = row.querySelectorAll('td');
+            if (cells.length >= 5) {
+              // Dx is in 3rd cell (index 2), Dy in 4th (index 3), Dz in 5th (index 4)
+              if (cells[2]) {
+                const dxValue = updatedElement.Dx !== null && updatedElement.Dx !== undefined ? updatedElement.Dx : '-';
+                cells[2].innerHTML = `<span class="text-sm">${dxValue}</span>`;
+                console.log(`Updated Dx cell to: ${dxValue}`);
+              }
+              if (cells[3]) {
+                const dyValue = updatedElement.Dy !== null && updatedElement.Dy !== undefined ? updatedElement.Dy : '-';
+                cells[3].innerHTML = `<span class="text-sm">${dyValue}</span>`;
+                console.log(`Updated Dy cell to: ${dyValue}`);
+              }
+              if (cells[4]) {
+                const dzValue = updatedElement.Dz !== null && updatedElement.Dz !== undefined ? updatedElement.Dz : '-';
+                cells[4].innerHTML = `<span class="text-sm">${dzValue}</span>`;
+                console.log(`Updated Dz cell to: ${dzValue}`);
+              }
+            } else {
+              console.warn(`Row ${rowIndex} has only ${cells.length} cells, expected at least 5`);
+            }
+          } else {
+            console.log(`No updated element found for ID ${elementId}`);
+          }
+        } else {
+          console.warn(`Could not extract element ID from input name: ${inputName}`);
+        }
+      } else {
+        console.warn(`Row ${rowIndex} has no quantity input`);
+      }
+    });
+  });
+}
+
+// Fallback: Refresh all subtype elements tables by re-fetching
+// Make it globally accessible
+window.refreshAllSubtypeElementsTables = function() {
+  const allSubTypeSelects = document.querySelectorAll('.element-subtype-select');
+  allSubTypeSelects.forEach(select => {
+    if (select.value) {
+      const subTypeId = select.value;
+      const formRow = select.closest('.element-form-row');
+      const elementsContainer = formRow ? formRow.querySelector('.subtype-elements-container') : null;
+      const elementsTbody = formRow ? formRow.querySelector('.subtype-elements-tbody') : null;
+      
+      if (!elementsContainer || !elementsTbody) {
+        return;
+      }
+      
+      // Re-fetch the subtype elements data
+      fetch(`/offers/ajax/get-subtype-elements/?sub_type_id=${subTypeId}`)
+        .then(response => response.json())
+        .then(data => {
+          elementsTbody.innerHTML = '';
+          
+          if (data.length === 0) {
+            elementsContainer.style.display = 'none';
+            return;
+          }
+          
+          elementsContainer.style.display = 'block';
+          
+          data.forEach((element, index) => {
+            const row = document.createElement('tr');
+            const formIndex = formRow ? formRow.getAttribute('data-form-index') : '0';
+            const qtyId = `element_${formIndex}_${element.id}_Qty`;
+            
+            row.innerHTML = `
+              <td>${element.element_name || '-'}</td>
+              <td>
+                <input type="number" 
+                       class="form-control form-control-sm" 
+                       id="${qtyId}"
+                       name="subtype_elements[${formIndex}][${element.id}][quantity]"
+                       value="${element.element_quantity || ''}" 
+                       min="1"
+                       placeholder="Qty">
+              </td>
+              <td>
+                <span class="text-sm">${element.Dx !== null && element.Dx !== undefined ? element.Dx : '-'}</span>
+              </td>
+              <td>
+                <span class="text-sm">${element.Dy !== null && element.Dy !== undefined ? element.Dy : '-'}</span>
+              </td>
+              <td>
+                <span class="text-sm">${element.Dz !== null && element.Dz !== undefined ? element.Dz : '-'}</span>
+              </td>
+            `;
+            elementsTbody.appendChild(row);
+          });
+        })
+        .catch(error => {
+          console.error('Error refreshing subtype elements:', error);
+        });
+    }
+  });
+};
+
+// Also keep the old function name for backward compatibility
+function refreshAllSubtypeElementsTables() {
+  return window.refreshAllSubtypeElementsTables();
 }
 
 // Initialize coefficient radio buttons

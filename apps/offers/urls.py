@@ -12,6 +12,9 @@ urlpatterns = [
     path('ajax/get-subtypes/', views.get_subtypes, name='get_subtypes'),
     path('ajax/get-subtype-elements/', views.get_subtype_elements, name='get_subtype_elements'),
     path('ajax/update-coefficient/', views.update_coefficient, name='update_coefficient'),
+    path('ajax/update-element-dimensions/', views.update_element_dimensions, name='update_element_dimensions'),
+    path('ajax/auto-save-offer/', views.auto_save_offer, name='auto_save_offer'),
+    path('ajax/recalculate-dimensions/<int:pk>/', views.recalculate_dimensions, name='recalculate_dimensions'),
 ]
 
 

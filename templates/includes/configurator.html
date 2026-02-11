@@ -71,7 +71,10 @@
           <h6 class="mb-0">Coefficient Settings</h6>
           <p class="text-sm">Select one coefficient per group for current offer.</p>
           {% if not current_offer_id %}
-          <p class="text-xs text-warning mb-0">⚠️ Please open an offer to configure coefficients.</p>
+          <p class="text-xs text-info mb-0">
+            ℹ️ Default coefficients are preselected. They will be saved when you create the offer. 
+            You can change them after saving.
+          </p>
           {% endif %}
         </div>
         <!-- Offer ID will be read from body data attribute by JavaScript -->
