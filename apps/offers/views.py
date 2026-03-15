@@ -7,6 +7,31 @@ from django.db import transaction
 from decimal import Decimal, InvalidOperation
 from .models import Offer, Element, ElementSubType, ElementSubTypeElements, CalculatedElementSubTypeElement, CoefficientGroup, Coefficient, OfferCoefficientSelection
 from .forms import OfferForm, ElementFormSet
+from .ladice_extra_fields import get_ladice_extra_fields_for_sub_type, LADICE_FIELD_NAMES
+
+
+def _save_elements_ladice_fields(formset, request):
+    """Save Ladice explicit fields from POST to Element. If value exists save it, if not leave as-is (don't overwrite)."""
+    total = int(request.POST.get('elements-TOTAL_FORMS', 0))
+    for i in range(total):
+        if i >= len(formset.forms) or formset.forms[i].cleaned_data.get('DELETE'):
+            continue
+        element = formset.forms[i].instance
+        update_fields = []
+        for field_name in LADICE_FIELD_NAMES:
+            key = f'elements-{i}-extra_{field_name}'
+            val = request.POST.get(key)
+            if val is not None:  # key was in POST
+                if val == '':
+                    setattr(element, field_name, None)
+                else:
+                    try:
+                        setattr(element, field_name, Decimal(val))
+                    except (ValueError, InvalidOperation):
+                        setattr(element, field_name, None)
+                update_fields.append(field_name)
+        if update_fields:
+            element.save(update_fields=update_fields)
 
 
 def _set_default_coefficients_for_offer(offer: Offer):
@@ -68,7 +93,8 @@ def offer_create(request):
             offer.save()
             formset.instance = offer
             formset.save()
-            
+            _save_elements_ladice_fields(formset, request)
+
             # Handle coefficient selection from form
             # Get all coefficient groups
             groups = CoefficientGroup.objects.prefetch_related('coefficients').all()
@@ -128,7 +154,8 @@ def offer_edit(request, pk):
         if form.is_valid() and formset.is_valid():
             form.save()
             formset.save()
-            
+            _save_elements_ladice_fields(formset, request)
+
             # Handle coefficient selection from form
             groups = CoefficientGroup.objects.prefetch_related('coefficients').all()
             for group in groups:
@@ -207,6 +234,23 @@ def get_subtypes(request):
         subtypes = ElementSubType.objects.filter(type=element_type).values('id', 'code', 'name', 'Dx', 'Dy', 'Dz')
         return JsonResponse(list(subtypes), safe=False)
     return JsonResponse([], safe=False)
+
+
+def get_subtype_extra_fields(request):
+    """AJAX endpoint to get extra fields schema for a sub-type (e.g. for Ladice)."""
+    sub_type_id = request.GET.get('sub_type_id')
+    if not sub_type_id:
+        return JsonResponse({'extra_fields': []})
+    try:
+        sub_type = ElementSubType.objects.get(pk=sub_type_id)
+        # For Ladice, use the defined mapping (LADICE 1–4); otherwise use DB schema
+        if sub_type.type == 'ladice':
+            schema = get_ladice_extra_fields_for_sub_type(sub_type)
+        else:
+            schema = sub_type.extra_fields_schema or []
+        return JsonResponse({'extra_fields': schema})
+    except (ElementSubType.DoesNotExist, ValueError):
+        return JsonResponse({'extra_fields': []})
 
 
 def get_subtype_elements(request):

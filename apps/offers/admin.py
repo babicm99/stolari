@@ -36,11 +36,21 @@ class ElementSubTypeAdmin(admin.ModelAdmin):
     list_display = ['code', 'type', 'name', 'image']
     list_filter = ['type']
     search_fields = ['name']
+    fieldsets = (
+        (None, {'fields': ('type', 'code', 'name')}),
+        (_('Dimensions'), {'fields': ('Dx', 'Dy', 'Dz')}),
+        (_('Image'), {'fields': ('image',)}),
+        (_('Extra fields (Ladice etc.)'), {
+            'fields': ('extra_fields_schema',),
+            'description': _('JSON list of extra inputs shown when this sub-type is selected. '
+                             'Example: [{"name": "broj_ladica", "label": "Broj ladiča", "type": "number", "required": true}]'),
+        }),
+    )
 
 
 @admin.register(Element)
 class ElementAdmin(admin.ModelAdmin):
-    list_display = ['offer', 'element_type', 'sub_type', 'quantity', 'Dx', 'Dy', 'Dz']
+    list_display = ['offer', 'element_type', 'sub_type', 'quantity', 'Dx', 'Dy', 'Dz', 'dubina_ladice', 'visina_fronte_1']
     list_filter = ['element_type']
     autocomplete_fields = ['sub_type']
     fieldsets = (
@@ -49,6 +59,10 @@ class ElementAdmin(admin.ModelAdmin):
         }),
         (_('Dimensions'), {
             'fields': ('Dx', 'Dy', 'Dz'),
+            'classes': ('collapse',)
+        }),
+        (_('Ladice fields'), {
+            'fields': ('dubina_ladice', 'visina_fronte_1', 'visina_fronte_2', 'visina_fronte_3', 'visina_fronte_4'),
             'classes': ('collapse',)
         }),
     )

@@ -139,13 +139,22 @@ class ElementSubType(models.Model):
 
     image = models.ImageField(upload_to='elements/', null=True, blank=True)
 
+    # Optional: list of extra input definitions for this sub-type (e.g. for Ladice).
+    # Format: [{"name": "field_name", "label": "Label", "type": "number"|"text"|"select", "required": true/false, "options": [...]}]
+    extra_fields_schema = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name=_('Extra fields schema'),
+        help_text=_('JSON list of extra input definitions shown when this sub-type is selected (e.g. for Ladice).')
+    )
+
     class Meta:
         unique_together = ('type', 'code')
         verbose_name = 'Element SubType'
         verbose_name_plural = 'Element SubTypes'
 
     def __str__(self):
-        return f"{self.type} - {self.code}"
+        return self.name.strip() if self.name and self.name.strip() else f"{self.type} - {self.code}"
         
 
 class Element(models.Model):
@@ -166,6 +175,12 @@ class Element(models.Model):
     Dx = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True, verbose_name='Dx')
     Dy = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True, verbose_name='Dy')
     Dz = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True, verbose_name='Dz')
+    # Ladice sub-type fields (saved only when present for the selected sub-type)
+    dubina_ladice = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True, verbose_name=_('DUBINA LADICE'))
+    visina_fronte_1 = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True, verbose_name=_('VISINA 1. FRONTE'))
+    visina_fronte_2 = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True, verbose_name=_('VISINA 2. FRONTE'))
+    visina_fronte_3 = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True, verbose_name=_('VISINA 3. FRONTE'))
+    visina_fronte_4 = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True, verbose_name=_('VISINA 4. FRONTE'))
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

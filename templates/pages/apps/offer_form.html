@@ -1,4 +1,5 @@
 {% extends "layouts/base.html" %}
+{% load offers_extras %}
 {% load static %}
 
 {% block content %}
@@ -168,7 +169,7 @@
                             {{ formset.management_form }}
                             <div id="elements-formset">
                                 {% for form in formset %}
-                                <div class="element-form-row card mb-3" data-form-index="{{ forloop.counter0 }}">
+                                <div class="element-form-row card mb-3" data-form-index="{{ forloop.counter0 }}" data-initial-ladice='{{ form.instance|ladice_initial_json }}'>
                                     <div class="card-body">
                                         <div class="d-flex justify-content-between align-items-center mb-3">
                                             <h6 class="mb-0">Element #<span class="element-number">{{ forloop.counter }}</span></h6>
@@ -254,6 +255,11 @@
                                                 {% endif %}
                                             </div>
                                         </div>
+                                        <!-- Sub-type extra fields (e.g. for Ladice); initial values in data-initial-ladice -->
+                                        <div class="ladice-extra-fields-container mt-3" style="display:none;">
+                                            <h6 class="mb-2">Dodatni podaci (Sub type)</h6>
+                                            <div class="row ladice-extra-fields-row"></div>
+                                        </div>
                                     </div>
                                 </div>
                                 {% endfor %}
@@ -308,7 +314,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 data.forEach(subtype => {
                     const option = document.createElement('option');
                     option.value = subtype.id;
-                    option.textContent = `${subtype.code}${subtype.name ? ' - ' + subtype.name : ''}`;
+                    option.textContent = subtype.name || subtype.code;
                     subTypeSelect.appendChild(option);
                     // Store dimension data
                     subTypeSelect.subtypeData[subtype.id] = {
@@ -355,6 +361,82 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+    // Load and show extra fields for Ladice (or other types) based on sub_type
+    function loadExtraFieldsForRow(formRow) {
+        const formIndex = formRow.getAttribute('data-form-index');
+        const elementTypeSelect = formRow.querySelector('.element-type-select');
+        const subTypeSelect = formRow.querySelector('.element-subtype-select');
+        const container = formRow.querySelector('.ladice-extra-fields-container');
+        const row = formRow.querySelector('.ladice-extra-fields-row');
+        if (!container || !row) return;
+        
+        const elementType = elementTypeSelect ? elementTypeSelect.value : '';
+        const subTypeId = subTypeSelect ? subTypeSelect.value : '';
+        
+        if (elementType !== 'ladice' || !subTypeId) {
+            container.style.display = 'none';
+            row.innerHTML = '';
+            return;
+        }
+        
+        fetch(`{% url 'offers:get_subtype_extra_fields' %}?sub_type_id=${subTypeId}`)
+            .then(response => response.json())
+            .then(data => {
+                const schema = data.extra_fields || [];
+                row.innerHTML = '';
+                if (schema.length === 0) {
+                    container.style.display = 'none';
+                    return;
+                }
+                let initialValues = {};
+                try {
+                    const raw = formRow.getAttribute('data-initial-ladice');
+                    if (raw) initialValues = JSON.parse(raw);
+                } catch (e) {}
+                schema.forEach(function(field) {
+                    const col = document.createElement('div');
+                    col.className = 'col-md-4 mb-3';
+                    const label = document.createElement('label');
+                    label.className = 'form-label';
+                    label.textContent = field.label || field.name;
+                    if (field.required) label.innerHTML += ' <span class="text-danger">*</span>';
+                    const inputName = `elements-${formIndex}-extra_${field.name}`;
+                    let input;
+                    if (field.type === 'select' && field.options && field.options.length) {
+                        input = document.createElement('select');
+                        input.className = 'form-control ladice-extra-input';
+                        input.name = inputName;
+                        input.dataset.fieldName = field.name;
+                        input.required = !!field.required;
+                        const emptyOpt = document.createElement('option');
+                        emptyOpt.value = '';
+                        emptyOpt.textContent = '---------';
+                        input.appendChild(emptyOpt);
+                        (field.options || []).forEach(function(opt) {
+                            const optEl = document.createElement('option');
+                            optEl.value = opt.value !== undefined ? opt.value : opt;
+                            optEl.textContent = opt.label !== undefined ? opt.label : opt;
+                            input.appendChild(optEl);
+                        });
+                        if (initialValues[field.name] !== undefined) input.value = initialValues[field.name];
+                    } else {
+                        input = document.createElement('input');
+                        input.type = field.type === 'number' ? 'number' : 'text';
+                        input.className = 'form-control ladice-extra-input';
+                        input.name = inputName;
+                        input.dataset.fieldName = field.name;
+                        if (field.type === 'number') input.step = '0.01';
+                        input.required = !!field.required;
+                        if (initialValues[field.name] !== undefined) input.value = initialValues[field.name];
+                    }
+                    col.appendChild(label);
+                    col.appendChild(input);
+                    row.appendChild(col);
+                });
+                container.style.display = 'block';
+            })
+            .catch(err => { console.error('Error loading extra fields:', err); container.style.display = 'none'; });
+    }
     
     // Initialize subtype updates for existing forms
     document.querySelectorAll('.element-type-select').forEach(select => {
@@ -363,17 +445,20 @@ document.addEventListener('DOMContentLoaded', function() {
         
         select.addEventListener('change', function() {
             updateSubtypes(this, subTypeSelect);
+            loadExtraFieldsForRow(formRow);
         });
         
-        // Add event listener for sub_type changes to auto-fill dimensions
+        // Add event listener for sub_type changes to auto-fill dimensions and load extra fields
         if (subTypeSelect) {
             subTypeSelect.addEventListener('change', function() {
                 autoFillDimensions(this);
+                loadExtraFieldsForRow(formRow);
             });
             
-            // If sub_type already has a value (editing existing form), auto-fill dimensions
+            // If sub_type already has a value (editing existing form), auto-fill dimensions and extra fields
             if (subTypeSelect.value) {
                 autoFillDimensions(subTypeSelect);
+                loadExtraFieldsForRow(formRow);
             }
         }
     });
@@ -429,6 +514,10 @@ document.addEventListener('DOMContentLoaded', function() {
                             <input type="number" name="elements-${formCount}-Dz" class="form-control" id="id_elements-${formCount}-Dz" step="0.01" placeholder="Dz">
                         </div>
                     </div>
+                    <div class="ladice-extra-fields-container mt-3" style="display:none;">
+                        <h6 class="mb-2">Dodatni podaci (Sub type)</h6>
+                        <div class="row ladice-extra-fields-row"></div>
+                    </div>
                 </div>
             </div>
         `;
@@ -444,12 +533,13 @@ document.addEventListener('DOMContentLoaded', function() {
         
         newElementTypeSelect.addEventListener('change', function() {
             updateSubtypes(this, newSubTypeSelect);
+            loadExtraFieldsForRow(newFormRow);
         });
         
-        // Add event listener for sub_type changes to auto-fill Element dimensions
+        // Add event listener for sub_type changes to auto-fill Element dimensions and load extra fields
         newSubTypeSelect.addEventListener('change', function() {
-            // Auto-fill Element dimensions from ElementSubType
             autoFillDimensions(this);
+            loadExtraFieldsForRow(newFormRow);
         });
         
         // Add remove button functionality
