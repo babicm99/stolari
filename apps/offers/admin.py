@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
-from .models import Offer, Element, ElementSubType, ElementSubTypeElements, CoefficientGroup, Coefficient, OfferCoefficientSelection
+from .models import Offer, Element, ElementSubType, ElementSubTypeElements, CalculatedElementSubTypeElement, CoefficientGroup, Coefficient, OfferCoefficientSelection
 
 
 @admin.register(Offer)
@@ -65,17 +65,38 @@ class ElementSubTypeElementsAdmin(admin.ModelAdmin):
         }),
         (_('Formula Configuration'), {
             'fields': ('formula_code',),
-            'description': _('Optional: Enter a formula code to use a custom calculation formula for this element. Leave blank to use default formulas.')
+            'description': _('If formula_code is set, Dx and Dy will be calculated automatically when saving an offer. '
+                          'The formula calculates both dimensions together. Only Dx and Dy are calculated (not Dz).')
         }),
         (_('Pricing'), {
             'fields': ('element_price', 'element_discount', 'element_total_price')
         }),
-        (_('Dimensions'), {
-            'fields': ('Dx', 'Dy', 'Dz'),
+    )
+    autocomplete_fields = ['element_sub_type']
+
+
+@admin.register(CalculatedElementSubTypeElement)
+class CalculatedElementSubTypeElementAdmin(admin.ModelAdmin):
+    list_display = ['element_name', 'element', 'offer', 'Dx', 'Dy', 'element_quantity', 'calculated_at']
+    list_filter = ['offer', 'element__element_type', 'calculated_at']
+    search_fields = ['element_name', 'element__sub_type__code', 'offer__title']
+    readonly_fields = ['calculated_at']
+    fieldsets = (
+        (_('Relations'), {
+            'fields': ('offer', 'element', 'sub_type_element')
+        }),
+        (_('Calculated Dimensions'), {
+            'fields': ('Dx', 'Dy')
+        }),
+        (_('Element Information'), {
+            'fields': ('element_name', 'element_quantity', 'element_price', 'element_discount', 'element_total_price')
+        }),
+        (_('Metadata'), {
+            'fields': ('calculated_at',),
             'classes': ('collapse',)
         }),
     )
-    autocomplete_fields = ['element_sub_type']
+    raw_id_fields = ['offer', 'element', 'sub_type_element']
 
 
 @admin.register(CoefficientGroup)

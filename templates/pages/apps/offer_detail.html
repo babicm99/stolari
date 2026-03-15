@@ -151,6 +151,60 @@
                                             {% endif %}
                                         </td>
                                     </tr>
+                                    {% if element.calculated_sub_type_elements.all %}
+                                        <tr>
+                                            <td colspan="6" class="pt-0 pb-3 px-4">
+                                                <div class="bg-light border-radius-lg p-3">
+                                                    <h6 class="text-uppercase text-secondary text-xxs font-weight-bolder mb-2">
+                                                        Element sub-type elements (calculated Dx, Dy)
+                                                    </h6>
+
+                                                    <div class="table-responsive">
+                                                        <table class="table table-sm table-bordered align-items-center mb-0">
+                                                            <thead>
+                                                                <tr>
+                                                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">
+                                                                        Element name
+                                                                    </th>
+                                                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">
+                                                                        Calculated Dx
+                                                                    </th>
+                                                                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">
+                                                                        Calculated Dy
+                                                                    </th>
+                                                                </tr>
+                                                            </thead>
+
+                                                            <tbody>
+                                                                {% for calc in element.calculated_sub_type_elements.all %}
+                                                                <tr>
+                                                                    <td class="text-sm">{{ calc.element_name }}</td>
+
+                                                                    <td class="text-sm text-center">
+                                                                        {% if calc.Dx is not None %}
+                                                                            {{ calc.Dx }}
+                                                                        {% else %}
+                                                                            <span class="text-muted">-</span>
+                                                                        {% endif %}
+                                                                    </td>
+
+                                                                    <td class="text-sm text-center">
+                                                                        {% if calc.Dy is not None %}
+                                                                            {{ calc.Dy }}
+                                                                        {% else %}
+                                                                            <span class="text-muted">-</span>
+                                                                        {% endif %}
+                                                                    </td>
+                                                                </tr>
+                                                                {% endfor %}
+                                                            </tbody>
+
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endif %}
                                     {% endfor %}
                                 </tbody>
                             </table>

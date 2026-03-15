@@ -5,7 +5,7 @@ from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.http import JsonResponse
 from django.db import transaction
 from decimal import Decimal, InvalidOperation
-from .models import Offer, Element, ElementSubType, ElementSubTypeElements, CoefficientGroup, Coefficient, OfferCoefficientSelection
+from .models import Offer, Element, ElementSubType, ElementSubTypeElements, CalculatedElementSubTypeElement, CoefficientGroup, Coefficient, OfferCoefficientSelection
 from .forms import OfferForm, ElementFormSet
 
 
@@ -69,8 +69,33 @@ def offer_create(request):
             formset.instance = offer
             formset.save()
             
-            # Auto-select default coefficients for new offer
-            _set_default_coefficients_for_offer(offer)
+            # Handle coefficient selection from form
+            # Get all coefficient groups
+            groups = CoefficientGroup.objects.prefetch_related('coefficients').all()
+            for group in groups:
+                coefficient_id = request.POST.get(f'coefficient_group_{group.id}')
+                if coefficient_id:
+                    try:
+                        coefficient = Coefficient.objects.get(id=coefficient_id, group=group)
+                        OfferCoefficientSelection.objects.update_or_create(
+                            offer=offer,
+                            group=group,
+                            defaults={'coefficient': coefficient}
+                        )
+                    except Coefficient.DoesNotExist:
+                        pass
+                else:
+                    # If no selection, use default coefficient
+                    default_coefficient = group.coefficients.filter(is_default=True).first()
+                    if default_coefficient:
+                        OfferCoefficientSelection.objects.get_or_create(
+                            offer=offer,
+                            group=group,
+                            defaults={'coefficient': default_coefficient}
+                        )
+            
+            # Trigger calculation after saving offer and coefficients
+            offer.recalculate_all_element_dimensions()
             
             messages.success(request, 'Offer created successfully!')
             return redirect('offers:detail', pk=offer.pk)
@@ -103,6 +128,24 @@ def offer_edit(request, pk):
         if form.is_valid() and formset.is_valid():
             form.save()
             formset.save()
+            
+            # Handle coefficient selection from form
+            groups = CoefficientGroup.objects.prefetch_related('coefficients').all()
+            for group in groups:
+                coefficient_id = request.POST.get(f'coefficient_group_{group.id}')
+                if coefficient_id:
+                    try:
+                        coefficient = Coefficient.objects.get(id=coefficient_id, group=group)
+                        OfferCoefficientSelection.objects.update_or_create(
+                            offer=offer,
+                            group=group,
+                            defaults={'coefficient': coefficient}
+                        )
+                    except Coefficient.DoesNotExist:
+                        pass
+            
+            # Trigger calculation after saving offer and coefficients
+            offer.recalculate_all_element_dimensions()
             
             messages.success(request, 'Offer updated successfully!')
             return redirect('offers:detail', pk=offer.pk)
@@ -167,15 +210,56 @@ def get_subtypes(request):
 
 
 def get_subtype_elements(request):
-    """AJAX endpoint to get ElementSubTypeElements based on ElementSubType ID"""
+    """
+    AJAX endpoint to get ElementSubTypeElements based on ElementSubType ID.
+    Returns configuration templates (ElementSubTypeElements).
+    If Element ID is provided, also returns calculated results from CalculatedElementSubTypeElement.
+    """
     sub_type_id = request.GET.get('sub_type_id')
+    element_id = request.GET.get('element_id')
+    
     if sub_type_id:
         try:
-            elements = ElementSubTypeElements.objects.filter(element_sub_type_id=sub_type_id).values(
-                'id', 'element_name', 'element_quantity', 'Dx', 'Dy', 'Dz'
-            )
-            return JsonResponse(list(elements), safe=False)
-        except (ValueError, TypeError):
+            from .models import CalculatedElementSubTypeElement
+            
+            # Get configuration templates
+            templates = ElementSubTypeElements.objects.filter(element_sub_type_id=sub_type_id)
+            
+            elements_data = []
+            for template in templates:
+                element_data = {
+                    'id': template.id,
+                    'element_name': template.element_name,
+                    'element_quantity': template.element_quantity,
+                    'formula_code': template.formula_code,
+                }
+                
+                # If element_id is provided, try to get calculated values
+                if element_id:
+                    try:
+                        calculated = CalculatedElementSubTypeElement.objects.get(
+                            element_id=element_id,
+                            sub_type_element=template
+                        )
+                        element_data['Dx'] = float(calculated.Dx) if calculated.Dx else None
+                        element_data['Dy'] = float(calculated.Dy) if calculated.Dy else None
+                        element_data['Dz'] = None  # Dz is not calculated
+                    except CalculatedElementSubTypeElement.DoesNotExist:
+                        element_data['Dx'] = None
+                        element_data['Dy'] = None
+                        element_data['Dz'] = None
+                else:
+                    element_data['Dx'] = None
+                    element_data['Dy'] = None
+                    element_data['Dz'] = None
+                
+                elements_data.append(element_data)
+            
+            return JsonResponse(elements_data, safe=False)
+        except (ValueError, TypeError) as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error in get_subtype_elements: {e}")
             return JsonResponse([], safe=False)
     return JsonResponse([], safe=False)
 
@@ -216,47 +300,8 @@ def update_coefficient(request):
                     selection.coefficient = coefficient
                     selection.save()
                 
-                # Explicitly trigger recalculation after coefficient change
-                # This ensures ElementSubTypeElements are updated immediately
-                recalculation_result = offer.recalculate_all_element_dimensions()
-                
-                # Get updated ElementSubTypeElements for all elements in this offer
-                # This will be used to update the UI
-                # Group by element_id so each Element gets its own calculated values
-                updated_elements_data = {}
-                for element in offer.elements.all():
-                    sub_type_elements = ElementSubTypeElements.objects.filter(
-                        element_sub_type=element.sub_type
-                    )
-                    
-                    # Calculate dimensions for each ElementSubTypeElements using this specific Element
-                    element_subtype_data = []
-                    for sub_elem in sub_type_elements:
-                        # Recalculate using this Element's dimensions
-                        from .calculations import calculate_element_dimensions
-                        dimensions = calculate_element_dimensions(element, offer, sub_elem)
-                        
-                        elem_data = {
-                            'id': sub_elem.id,
-                            'element_name': sub_elem.element_name,
-                            'element_sub_type_id': sub_elem.element_sub_type_id,
-                            'Dx': float(dimensions['Dx']) if dimensions['Dx'] is not None else None,
-                            'Dy': float(dimensions['Dy']) if dimensions['Dy'] is not None else None,
-                            'Dz': float(dimensions['Dz']) if dimensions['Dz'] is not None else None,
-                        }
-                        element_subtype_data.append(elem_data)
-                    
-                    # Store by element_id so frontend can update the correct table
-                    updated_elements_data[element.id] = element_subtype_data
-                
-                # Log the recalculation
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.info(
-                    f"Coefficient updated for offer {offer.id}: "
-                    f"Updated {recalculation_result['updated']} elements, "
-                    f"{recalculation_result['errors']} errors"
-                )
+                # Note: Calculation is no longer triggered on coefficient change
+                # It will be triggered when the form is saved
             
             return JsonResponse({
                 'success': True,
@@ -264,13 +309,7 @@ def update_coefficient(request):
                 'coefficient_name': coefficient.name,
                 'group_id': group.id,
                 'offer_id': offer.id,
-                'message': 'Coefficient updated and dimensions recalculated',
-                'recalculation': {
-                    'updated_elements': recalculation_result['updated'],
-                    'errors': recalculation_result['errors'],
-                    'total': recalculation_result['total']
-                },
-                'updated_subtype_elements_by_element': updated_elements_data
+                'message': 'Coefficient updated. Calculations will run when you save the offer.'
             })
             
         except Exception as e:
@@ -356,22 +395,8 @@ def update_element_dimensions(request):
                 except (ValueError, InvalidOperation):
                     return JsonResponse({'success': False, 'error': f'Invalid Dz value: {dz}'}, status=400)
             
-            # Save the element (this will trigger the signal which recalculates ElementSubTypeElements)
+            # Save the element (calculation will be triggered when form is saved)
             element.save(update_fields=['Dx', 'Dy', 'Dz'])
-            
-            # Get updated ElementSubTypeElements for this element's sub_type
-            updated_elements_data = []
-            sub_type_elements = ElementSubTypeElements.objects.filter(
-                element_sub_type=element.sub_type
-            ).values('id', 'element_name', 'Dx', 'Dy', 'Dz', 'element_sub_type_id')
-            
-            for sub_elem in sub_type_elements:
-                # Convert Decimal to float for JSON serialization
-                elem_data = dict(sub_elem)
-                elem_data['Dx'] = float(sub_elem['Dx']) if sub_elem['Dx'] is not None else None
-                elem_data['Dy'] = float(sub_elem['Dy']) if sub_elem['Dy'] is not None else None
-                elem_data['Dz'] = float(sub_elem['Dz']) if sub_elem['Dz'] is not None else None
-                updated_elements_data.append(elem_data)
             
             import logging
             logger = logging.getLogger(__name__)
@@ -385,8 +410,7 @@ def update_element_dimensions(request):
                 'Dx': float(element.Dx) if element.Dx else None,
                 'Dy': float(element.Dy) if element.Dy else None,
                 'Dz': float(element.Dz) if element.Dz else None,
-                'updated_subtype_elements': updated_elements_data,
-                'message': 'Element dimensions updated and recalculated'
+                'message': 'Element dimensions updated. Calculations will run when you save the offer.'
             })
             
         except Exception as e:
