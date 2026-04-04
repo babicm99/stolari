@@ -318,4 +318,29 @@ class OfferCoefficientSelection(models.Model):
 
     def __str__(self):
         return f"{self.offer} → {self.coefficient}"
+
+
+class UserCoefficientPreference(models.Model):
+    """Per-user default coefficient per group (used when creating new offers)."""
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="coefficient_preferences",
+    )
+    group = models.ForeignKey(
+        CoefficientGroup,
+        on_delete=models.CASCADE,
+    )
+    coefficient = models.ForeignKey(
+        Coefficient,
+        on_delete=models.CASCADE,
+    )
+
+    class Meta:
+        unique_together = ("user", "group")
+        verbose_name = "User Coefficient Preference"
+        verbose_name_plural = "User Coefficient Preferences"
+
+    def __str__(self):
+        return f"{self.user} → {self.coefficient}"
     

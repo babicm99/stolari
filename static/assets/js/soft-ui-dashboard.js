@@ -1154,6 +1154,51 @@ function updateCoefficientSelection(el) {
   });
 }
 
+function updateUserCoefficientPreference(el) {
+  const coefficientId = el.getAttribute('data-coefficient-id');
+  const groupId = el.getAttribute('data-group-id');
+  if (!coefficientId || !groupId) {
+    console.error('Missing coefficient_id or group_id for profile default');
+    el.checked = false;
+    return;
+  }
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+  const csrftoken = getCookie('csrftoken');
+  fetch('/users/ajax/update-coefficient-preference/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'X-Requested-With': 'XMLHttpRequest',
+      'X-CSRFToken': csrftoken
+    },
+    body: 'coefficient_id=' + encodeURIComponent(coefficientId) + '&group_id=' + encodeURIComponent(groupId)
+  })
+    .then(function (response) { return response.json(); })
+    .then(function (data) {
+      if (!data.success) {
+        console.error('Profile coefficient preference failed:', data.error);
+        el.checked = false;
+      }
+    })
+    .catch(function (err) {
+      console.error('Error:', err);
+      el.checked = false;
+    });
+}
+
 // Helper function to refresh ElementSubTypeElements display after recalculation
 // Make it globally accessible
 window.refreshSubtypeElementsDisplay = function(updatedElements) {
@@ -1304,13 +1349,19 @@ function refreshAllSubtypeElementsTables() {
   return window.refreshAllSubtypeElementsTables();
 }
 
-// Initialize coefficient radio buttons
+// Initialize coefficient radio buttons (offer-level; requires data-offer-id on body)
 document.addEventListener('DOMContentLoaded', function() {
-  const coefficientRadios = document.querySelectorAll('.coefficient-radio');
-  coefficientRadios.forEach(function(radioEl) {
+  document.querySelectorAll('.coefficient-radio').forEach(function(radioEl) {
     radioEl.addEventListener('change', function() {
       if (this.checked) {
         updateCoefficientSelection(this);
+      }
+    });
+  });
+  document.querySelectorAll('.user-coefficient-radio').forEach(function(radioEl) {
+    radioEl.addEventListener('change', function() {
+      if (this.checked) {
+        updateUserCoefficientPreference(this);
       }
     });
   });

@@ -5,7 +5,17 @@ from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.http import JsonResponse
 from django.db import transaction
 from decimal import Decimal, InvalidOperation
-from .models import Offer, Element, ElementSubType, ElementSubTypeElements, CalculatedElementSubTypeElement, CoefficientGroup, Coefficient, OfferCoefficientSelection
+from .models import (
+    Offer,
+    Element,
+    ElementSubType,
+    ElementSubTypeElements,
+    CalculatedElementSubTypeElement,
+    CoefficientGroup,
+    Coefficient,
+    OfferCoefficientSelection,
+    UserCoefficientPreference,
+)
 from .forms import OfferForm, ElementFormSet
 from .ladice_extra_fields import get_ladice_extra_fields_for_sub_type, LADICE_FIELD_NAMES
 
@@ -34,24 +44,35 @@ def _save_elements_ladice_fields(formset, request):
             element.save(update_fields=update_fields)
 
 
+def _coefficient_for_new_offer_group(user, group, posted_coefficient_id=None):
+    """Resolve coefficient: POST override, then user profile preference, then global default."""
+    if posted_coefficient_id:
+        try:
+            return Coefficient.objects.get(id=posted_coefficient_id, group=group)
+        except Coefficient.DoesNotExist:
+            pass
+    if user and user.is_authenticated:
+        pref = (
+            UserCoefficientPreference.objects.filter(user=user, group=group)
+            .select_related("coefficient")
+            .first()
+        )
+        if pref:
+            return pref.coefficient
+    return group.coefficients.filter(is_default=True).first()
+
+
 def _set_default_coefficients_for_offer(offer: Offer):
-    """
-    Set default coefficients for a new offer.
-    Selects the coefficient marked as is_default=True for each group.
-    """
-    # Get all coefficient groups
-    groups = CoefficientGroup.objects.prefetch_related('coefficients').all()
-    
+    """Apply user profile defaults, then global is_default, for each group."""
+    user = offer.created_by
+    groups = CoefficientGroup.objects.prefetch_related("coefficients").all()
     for group in groups:
-        # Find the default coefficient for this group
-        default_coefficient = group.coefficients.filter(is_default=True).first()
-        
-        if default_coefficient:
-            # Create selection for this default coefficient
+        coeff = _coefficient_for_new_offer_group(user, group)
+        if coeff:
             OfferCoefficientSelection.objects.get_or_create(
                 offer=offer,
                 group=group,
-                defaults={'coefficient': default_coefficient}
+                defaults={"coefficient": coeff},
             )
 
 
@@ -95,30 +116,18 @@ def offer_create(request):
             formset.save()
             _save_elements_ladice_fields(formset, request)
 
-            # Handle coefficient selection from form
-            # Get all coefficient groups
-            groups = CoefficientGroup.objects.prefetch_related('coefficients').all()
+            groups = CoefficientGroup.objects.prefetch_related("coefficients").all()
             for group in groups:
-                coefficient_id = request.POST.get(f'coefficient_group_{group.id}')
-                if coefficient_id:
-                    try:
-                        coefficient = Coefficient.objects.get(id=coefficient_id, group=group)
-                        OfferCoefficientSelection.objects.update_or_create(
-                            offer=offer,
-                            group=group,
-                            defaults={'coefficient': coefficient}
-                        )
-                    except Coefficient.DoesNotExist:
-                        pass
-                else:
-                    # If no selection, use default coefficient
-                    default_coefficient = group.coefficients.filter(is_default=True).first()
-                    if default_coefficient:
-                        OfferCoefficientSelection.objects.get_or_create(
-                            offer=offer,
-                            group=group,
-                            defaults={'coefficient': default_coefficient}
-                        )
+                posted = request.POST.get(f"coefficient_group_{group.id}")
+                coefficient = _coefficient_for_new_offer_group(
+                    request.user, group, posted_coefficient_id=posted or None
+                )
+                if coefficient:
+                    OfferCoefficientSelection.objects.update_or_create(
+                        offer=offer,
+                        group=group,
+                        defaults={"coefficient": coefficient},
+                    )
             
             # Trigger calculation after saving offer and coefficients
             offer.recalculate_all_element_dimensions()

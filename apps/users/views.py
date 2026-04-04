@@ -1,9 +1,13 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from apps.users.models import Profile
-from apps.users.forms import ProfileForm, QuillFieldForm
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.hashers import check_password
 from django.contrib import messages
+from django.db import transaction
+from django.http import JsonResponse
+
+from apps.users.models import Profile
+from apps.users.forms import ProfileForm, QuillFieldForm
+from apps.offers.models import Coefficient, CoefficientGroup, UserCoefficientPreference
 
 # Create your views here.
 
@@ -62,6 +66,44 @@ def change_password(request):
             messages.error(request, "Password doesn't match!")
 
     return redirect(request.META.get('HTTP_REFERER'))
+
+
+@login_required(login_url="/accounts/login/basic-login/")
+def update_coefficient_preference(request):
+    """Save per-group default coefficients for the current user (sidebar configurator)."""
+    if request.method != "POST" or request.headers.get("X-Requested-With") != "XMLHttpRequest":
+        return JsonResponse({"success": False, "error": "Invalid request"}, status=400)
+    try:
+        coefficient_id = request.POST.get("coefficient_id")
+        group_id = request.POST.get("group_id")
+        if not coefficient_id or not group_id:
+            return JsonResponse(
+                {"success": False, "error": "Missing coefficient_id or group_id"},
+                status=400,
+            )
+        coefficient = get_object_or_404(Coefficient, id=coefficient_id)
+        group = get_object_or_404(CoefficientGroup, id=group_id)
+        if coefficient.group_id != group.id:
+            return JsonResponse(
+                {"success": False, "error": "Coefficient does not belong to this group"},
+                status=400,
+            )
+        with transaction.atomic():
+            UserCoefficientPreference.objects.update_or_create(
+                user=request.user,
+                group=group,
+                defaults={"coefficient": coefficient},
+            )
+        return JsonResponse(
+            {
+                "success": True,
+                "coefficient_id": coefficient.id,
+                "coefficient_name": coefficient.name,
+                "group_id": group.id,
+            }
+        )
+    except Exception as e:
+        return JsonResponse({"success": False, "error": str(e)}, status=400)
 
 
 @login_required(login_url='/accounts/login/basic-login/')

@@ -1,6 +1,16 @@
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
-from .models import Offer, Element, ElementSubType, ElementSubTypeElements, CalculatedElementSubTypeElement, CoefficientGroup, Coefficient, OfferCoefficientSelection
+from .models import (
+    Offer,
+    Element,
+    ElementSubType,
+    ElementSubTypeElements,
+    CalculatedElementSubTypeElement,
+    CoefficientGroup,
+    Coefficient,
+    OfferCoefficientSelection,
+    UserCoefficientPreference,
+)
 
 
 @admin.register(Offer)
@@ -142,3 +152,11 @@ class OfferCoefficientSelectionAdmin(admin.ModelAdmin):
     list_filter = ('group',)
     search_fields = ('offer__title', 'group__name', 'coefficient__name')
     raw_id_fields = ('offer', 'group', 'coefficient')
+
+
+@admin.register(UserCoefficientPreference)
+class UserCoefficientPreferenceAdmin(admin.ModelAdmin):
+    list_display = ('user', 'group', 'coefficient')
+    list_filter = ('group',)
+    search_fields = ('user__username', 'group__name', 'coefficient__name')
+    raw_id_fields = ('user', 'group', 'coefficient')
