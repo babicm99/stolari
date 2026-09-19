@@ -18,7 +18,7 @@ django.setup()
 from django.db import connection
 
 SQL = """
-INSERT INTO offers_elementsubtypeelements (
+INSERT INTO offers_elementsubtype (
   element_name,
   element_quantity,
   element_price,
@@ -35,7 +35,7 @@ SELECT
   0,
   v.formula_code,
   est.id
-FROM offers_elementsubtype est
+FROM offers_element est
 CROSS JOIN (
   SELECT 'Vezac/Plafon' AS element_name, 'PLAFONVEZAC_CALCULATION' AS formula_code
   UNION ALL SELECT 'Fronta', 'FRONTA_CALCULATION'
@@ -48,7 +48,7 @@ WHERE est.type = 'ladice'
   AND est.code IN ('LADICE_1', 'LADICE_2', 'LADICE_3', 'LADICE_4')
   AND NOT EXISTS (
     SELECT 1
-    FROM offers_elementsubtypeelements e
+    FROM offers_elementsubtype e
     WHERE e.element_sub_type_id = est.id
       AND e.element_name = v.element_name
   );

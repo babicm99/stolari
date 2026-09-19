@@ -3,7 +3,7 @@ Django signals for automatic dimension calculations.
 """
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
-from .models import OfferCoefficientSelection, Element, ElementSubTypeElements
+from .models import OfferCoefficientSelection, OfferElement
 
 
 # Disabled: Calculation is now only triggered on Save Offer button
@@ -28,20 +28,20 @@ from .models import OfferCoefficientSelection, Element, ElementSubTypeElements
 #         logger.error(f"Error recalculating dimensions for offer {instance.offer.id}: {e}")
 
 
-@receiver(pre_save, sender=Element)
+@receiver(pre_save, sender=OfferElement)
 def store_element_dimensions_before_save(sender, instance, **kwargs):
     """
     Store the old dimension values and sub_type before save to detect changes.
     """
     if instance.pk:
         try:
-            old_instance = Element.objects.get(pk=instance.pk)
+            old_instance = OfferElement.objects.get(pk=instance.pk)
             # Store old values in instance for comparison in post_save
             instance._old_dx = old_instance.Dx
             instance._old_dy = old_instance.Dy
             instance._old_dz = old_instance.Dz
             instance._old_sub_type_id = old_instance.sub_type_id
-        except Element.DoesNotExist:
+        except OfferElement.DoesNotExist:
             instance._old_dx = None
             instance._old_dy = None
             instance._old_dz = None

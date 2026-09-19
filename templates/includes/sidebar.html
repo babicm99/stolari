@@ -34,6 +34,12 @@
           </a>
           <div class="collapse {% if 'apps' in parent %}show{% endif %} " id="apps-dropdown">
             <ul class="nav ms-4 ps-3">
+              <li class="nav-item {% if 'offers' in segment %}active{% endif %}">
+                <a class="nav-link {% if 'offers' in segment %}active{% endif %}" href="{% url 'offers:list' %}">
+                  <span class="sidenav-mini-icon"> O </span>
+                  <span class="sidenav-normal"> Offers </span>
+                </a>
+              </li>
               <li class="nav-item {% if 'elements' in segment %}active{% endif %}">
                 <a class="nav-link {% if 'elements' in segment %}active{% endif %}" href="{% url 'offers:elements_list' %}">
                   <span class="sidenav-mini-icon"> E </span>

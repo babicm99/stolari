@@ -3,8 +3,8 @@ from django.utils.translation import gettext_lazy as _
 from .models import (
     Offer,
     Element,
+    OfferElement,
     ElementSubType,
-    ElementSubTypeElements,
     CalculatedElementSubTypeElement,
     CoefficientGroup,
     Coefficient,
@@ -44,11 +44,11 @@ class OfferAdmin(admin.ModelAdmin):
         super().save_model(request, obj, form, change)
 
 
-@admin.register(ElementSubType)
-class ElementSubTypeAdmin(admin.ModelAdmin):
+@admin.register(Element)
+class ElementAdmin(admin.ModelAdmin):
     list_display = ['code', 'type', 'name', 'image']
     list_filter = ['type']
-    search_fields = ['name']
+    search_fields = ['code', 'name']
     fieldsets = (
         (None, {'fields': ('type', 'code', 'name')}),
         (_('Dimensions'), {'fields': ('Dx', 'Dy', 'Dz')}),
@@ -61,8 +61,8 @@ class ElementSubTypeAdmin(admin.ModelAdmin):
     )
 
 
-@admin.register(Element)
-class ElementAdmin(admin.ModelAdmin):
+@admin.register(OfferElement)
+class OfferElementAdmin(admin.ModelAdmin):
     list_display = ['offer', 'element_type', 'sub_type', 'material', 'quantity', 'Dx', 'Dy', 'Dz', 'dubina_ladice', 'visina_fronte_1']
     list_filter = ['element_type']
     autocomplete_fields = ['sub_type']
@@ -81,8 +81,8 @@ class ElementAdmin(admin.ModelAdmin):
     )
 
 
-@admin.register(ElementSubTypeElements)
-class ElementSubTypeElementsAdmin(admin.ModelAdmin):
+@admin.register(ElementSubType)
+class ElementSubTypeAdmin(admin.ModelAdmin):
     list_display = ['element_name', 'formula_code', 'element_sub_type', 'element_quantity', 'element_price', 'element_discount', 'element_total_price']
     list_filter = ['element_sub_type', 'element_sub_type__type', 'formula_code']
     search_fields = ['element_name', 'element_sub_type__code', 'element_sub_type__name', 'formula_code']

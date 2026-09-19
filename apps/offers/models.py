@@ -63,7 +63,7 @@ class Offer(models.Model):
         for element in elements:
             # Get all ElementSubTypeElements templates for this Element's sub_type
             # Only those that have formula_code set (need calculation)
-            sub_type_elements = ElementSubTypeElements.objects.filter(
+            sub_type_elements = ElementSubType.objects.filter(
                 element_sub_type=element.sub_type
             ).exclude(
                 models.Q(formula_code__isnull=True) | models.Q(formula_code='')
@@ -169,7 +169,7 @@ class ElementType(models.TextChoices):
     LADICE = 'ladice', 'Ladice'
 
 
-class ElementSubType(models.Model):
+class Element(models.Model):
     type = models.CharField(max_length=50, choices=ElementType.choices)
     code = models.CharField(max_length=50, verbose_name='Code')  # npr DE1V, GE1V...
     name = models.CharField(max_length=100, verbose_name='Name', blank=True)
@@ -191,14 +191,14 @@ class ElementSubType(models.Model):
 
     class Meta:
         unique_together = ('type', 'code')
-        verbose_name = 'Element SubType'
-        verbose_name_plural = 'Element SubTypes'
+        verbose_name = 'Element'
+        verbose_name_plural = 'Elements'
 
     def __str__(self):
         return self.name.strip() if self.name and self.name.strip() else f"{self.type} - {self.code}"
         
 
-class Element(models.Model):
+class OfferElement(models.Model):
     offer = models.ForeignKey(
         'Offer', 
         on_delete=models.CASCADE, 
@@ -206,8 +206,9 @@ class Element(models.Model):
     )
     element_type = models.CharField(max_length=50, choices=ElementType.choices)
     sub_type = models.ForeignKey(
-        ElementSubType,
+        Element,
         on_delete=models.PROTECT,
+        related_name='offer_elements',
         verbose_name='Sub Type',
         limit_choices_to=models.Q(type=models.F('type'))
     )
@@ -235,16 +236,18 @@ class Element(models.Model):
 
     class Meta:
         ordering = ['element_type', 'sub_type']
+        verbose_name = 'Offer Element'
+        verbose_name_plural = 'Offer Elements'
 
     def __str__(self):
         return f"{self.element_type} - {self.sub_type.code} ({self.offer.title})"
     
 
-# ElementSubTypeElements is a configuration table that defines which elements exist for each ElementSubType
+# ElementSubType is a configuration table that defines which sub types exist for each Element
 # This is a pure configuration table - no calculated data is stored here
-class ElementSubTypeElements(models.Model):
+class ElementSubType(models.Model):
     element_name = models.CharField(max_length=255, verbose_name=_('Element Name'))
-    element_sub_type = models.ForeignKey(ElementSubType, on_delete=models.CASCADE, verbose_name=_('Element Sub Type'), related_name='sub_type_elements')
+    element_sub_type = models.ForeignKey(Element, on_delete=models.CASCADE, verbose_name=_('Element'), related_name='sub_type_elements')
     element_quantity = models.IntegerField(verbose_name=_('Element Quantity'), default=1)
     element_price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_('Element Price'), default=0)
     element_discount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_('Element Discount'), default=0)
@@ -257,8 +260,8 @@ class ElementSubTypeElements(models.Model):
                                     help_text=_('If set, Dx and Dy will be calculated using this formula when saving the offer. The formula calculates both dimensions together.'))
 
     class Meta:
-        verbose_name = _('ElementSubTypeElements')
-        verbose_name_plural = _('ElementSubTypeElements')
+        verbose_name = _('Element SubType')
+        verbose_name_plural = _('Element SubTypes')
         unique_together = ('element_sub_type', 'element_name')
 
     def __str__(self):
@@ -274,13 +277,13 @@ class CalculatedElementSubTypeElement(models.Model):
         verbose_name=_('Offer')
     )
     element = models.ForeignKey(
-        'Element',
+        'OfferElement',
         on_delete=models.CASCADE,
         related_name='calculated_sub_type_elements',
-        verbose_name=_('Element')
+        verbose_name=_('Offer Element')
     )
     sub_type_element = models.ForeignKey(
-        ElementSubTypeElements,
+        ElementSubType,
         on_delete=models.CASCADE,
         related_name='calculated_instances',
         verbose_name=_('Sub Type Element Template')

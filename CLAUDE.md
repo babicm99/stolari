@@ -63,21 +63,21 @@ npm install
 
 ```
 Offer (created_by User)
- ├─ Element (1-N): user-input Dx, Dy, Dz dimensions + element_type + sub_type
+ ├─ OfferElement (1-N): user-input Dx, Dy, Dz dimensions + element_type + sub_type
  ├─ OfferCoefficientSelection (1-N): selected Coefficient per CoefficientGroup
  └─ CalculatedElementSubTypeElement (1-N): calculated Dx, Dy results
 
 CoefficientGroup → Coefficient (is_default flag)
 UserCoefficientPreference → per-user default coefficients per group
-ElementSubType → ElementSubTypeElements (formula templates with formula_code)
+Element → ElementSubType (formula templates with formula_code)
 ```
 
 ### Calculation Engine (`apps/offers/calculations.py` — 720 lines)
 
-The most complex part of the codebase. `DimensionCalculator` computes final Dx/Dy for each `ElementSubTypeElements` record using:
-1. User-input Element dimensions (Dx, Dy, Dz)
+The most complex part of the codebase. `DimensionCalculator` computes final Dx/Dy for each `ElementSubType` record using:
+1. User-input OfferElement dimensions (Dx, Dy, Dz)
 2. Selected offer coefficients from `OfferCoefficientSelection`
-3. Per-element formula code from `ElementSubTypeElements.formula_code`
+3. Per-element formula code from `ElementSubType.formula_code`
 
 Recalculation is triggered via Django signals when coefficients or element dimensions change, and manually via AJAX at `/offers/ajax/recalculate-dimensions/<id>/`.
 
@@ -85,7 +85,7 @@ See `apps/offers/CALCULATIONS_README.md` for formula documentation and `apps/off
 
 ### Element Types
 - `donji_elementi` (lower elements), `gornji_elementi` (upper elements), `visoki_elementi` (tall elements), `ladice` (drawers)
-- **Ladice** have special handling: extra fields schema on `ElementSubType.extra_fields_schema` (JSON) and explicit fields `dubina_ladice`, `visina_fronte_1–4` on `Element`
+- **Ladice** have special handling: extra fields schema on `Element.extra_fields_schema` (JSON) and explicit fields `dubina_ladice`, `visina_fronte_1–4` on `OfferElement`
 
 ### Authentication
 - django-allauth with email-based login + optional OAuth (Google, GitHub)

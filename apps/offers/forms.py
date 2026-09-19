@@ -2,12 +2,12 @@ from django import forms
 from django.forms import inlineformset_factory
 from django.utils import timezone
 from django.db.models import Q
-from .models import Offer, Element, ElementSubType, ElementType, Material
+from .models import Offer, OfferElement, Element, ElementType, Material
 
 
-class ElementSubTypeForm(forms.ModelForm):
+class ElementForm(forms.ModelForm):
     class Meta:
-        model = ElementSubType
+        model = Element
         fields = ['type', 'code', 'name', 'Dx', 'Dy', 'Dz', 'image']
         widgets = {
             'type': forms.Select(attrs={'class': 'form-control'}),
@@ -44,9 +44,9 @@ class OfferForm(forms.ModelForm):
                 self.fields['start_date'].initial = timezone.now().date()
 
 
-class ElementForm(forms.ModelForm):
+class OfferElementForm(forms.ModelForm):
     class Meta:
-        model = Element
+        model = OfferElement
         fields = ['element_type', 'sub_type', 'material', 'quantity', 'Dx', 'Dy', 'Dz']
         widgets = {
             'element_type': forms.Select(attrs={'class': 'form-control element-type-select'}),
@@ -60,7 +60,7 @@ class ElementForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         material_qs = kwargs.pop('material_qs', None)
-        super(ElementForm, self).__init__(*args, **kwargs)
+        super(OfferElementForm, self).__init__(*args, **kwargs)
         self.fields['element_type'].choices = [('', '---------')] + list(ElementType.choices)
         self.fields['material'].queryset = (
             material_qs if material_qs is not None
@@ -76,7 +76,7 @@ class ElementForm(forms.ModelForm):
         # Check if we have instance data (editing existing element)
         if self.instance and self.instance.pk:
             element_type = self.instance.element_type
-            self.fields['sub_type'].queryset = ElementSubType.objects.filter(type=element_type)
+            self.fields['sub_type'].queryset = Element.objects.filter(type=element_type)
         # Check if we have POST data (form submission)
         elif self.data:
             # Get the prefix for this form (formset uses prefixes like 'elements-0', 'elements-1', etc.)
@@ -96,14 +96,14 @@ class ElementForm(forms.ModelForm):
             # Build queryset: filter by element_type, but always include selected sub_type
             if element_type:
                 # Start with subtypes matching the element_type
-                queryset = ElementSubType.objects.filter(type=element_type)
+                queryset = Element.objects.filter(type=element_type)
                 
                 # Always include the selected sub_type if provided (to avoid validation errors)
                 if selected_sub_type_id:
                     try:
                         selected_id = int(selected_sub_type_id)
                         # Use Q objects to include both the filtered types and the selected one
-                        queryset = ElementSubType.objects.filter(
+                        queryset = Element.objects.filter(
                             Q(type=element_type) | Q(pk=selected_id)
                         )
                     except (ValueError, TypeError):
@@ -115,23 +115,23 @@ class ElementForm(forms.ModelForm):
                 if selected_sub_type_id:
                     try:
                         selected_id = int(selected_sub_type_id)
-                        self.fields['sub_type'].queryset = ElementSubType.objects.filter(pk=selected_id)
-                    except (ValueError, TypeError, ElementSubType.DoesNotExist):
+                        self.fields['sub_type'].queryset = Element.objects.filter(pk=selected_id)
+                    except (ValueError, TypeError, Element.DoesNotExist):
                         # Fallback to all if we can't find the specific one
-                        self.fields['sub_type'].queryset = ElementSubType.objects.all()
+                        self.fields['sub_type'].queryset = Element.objects.all()
                 else:
                     # No data yet, show all (will be filtered by JS)
-                    self.fields['sub_type'].queryset = ElementSubType.objects.all()
+                    self.fields['sub_type'].queryset = Element.objects.all()
         else:
             # Initial form load - no data yet
-            self.fields['sub_type'].queryset = ElementSubType.objects.none()
+            self.fields['sub_type'].queryset = Element.objects.none()
 
 
 # Create formset factory
 ElementFormSet = inlineformset_factory(
     Offer,
-    Element,
-    form=ElementForm,
+    OfferElement,
+    form=OfferElementForm,
     extra=1,
     can_delete=True,
     min_num=0,

@@ -11,8 +11,8 @@ import json
 from .models import (
     Offer,
     Element,
+    OfferElement,
     ElementSubType,
-    ElementSubTypeElements,
     CalculatedElementSubTypeElement,
     CoefficientGroup,
     Coefficient,
@@ -20,7 +20,7 @@ from .models import (
     UserCoefficientPreference,
     Material,
 )
-from .forms import OfferForm, ElementFormSet, ElementSubTypeForm
+from .forms import OfferForm, ElementFormSet, ElementForm
 from .ladice_extra_fields import get_ladice_extra_fields_for_sub_type, LADICE_FIELD_NAMES
 
 
@@ -138,9 +138,9 @@ def offers_list(request):
 def elements_list(request):
     """Display list of all element sub types"""
     sub_types = (
-        ElementSubType.objects.annotate(
+        Element.objects.annotate(
             sub_type_elements_count=Count('sub_type_elements', distinct=True),
-            used_in_offers_count=Count('element', distinct=True),
+            used_in_offers_count=Count('offer_elements', distinct=True),
         )
         .order_by('type', 'code')
     )
@@ -169,13 +169,13 @@ def elements_list(request):
 def element_subtype_create(request):
     """Create a new element sub type"""
     if request.method == 'POST':
-        form = ElementSubTypeForm(request.POST, request.FILES)
+        form = ElementForm(request.POST, request.FILES)
         if form.is_valid():
             form.save()
             messages.success(request, 'Element created successfully!')
             return redirect('offers:elements_list')
     else:
-        form = ElementSubTypeForm()
+        form = ElementForm()
 
     context = {
         'segment': 'elements',
@@ -189,8 +189,8 @@ def element_subtype_create(request):
 @login_required(login_url='/accounts/login/basic-login/')
 def element_subtype_delete(request, pk):
     """Delete an element sub type"""
-    sub_type = get_object_or_404(ElementSubType, pk=pk)
-    used_in_offers_count = sub_type.element_set.count()
+    sub_type = get_object_or_404(Element, pk=pk)
+    used_in_offers_count = sub_type.offer_elements.count()
 
     if request.method == 'POST':
         if used_in_offers_count:
@@ -363,7 +363,7 @@ def get_subtypes(request):
     """AJAX endpoint to get subtypes based on element type"""
     element_type = request.GET.get('element_type')
     if element_type:
-        subtypes = ElementSubType.objects.filter(type=element_type).values('id', 'code', 'name', 'Dx', 'Dy', 'Dz')
+        subtypes = Element.objects.filter(type=element_type).values('id', 'code', 'name', 'Dx', 'Dy', 'Dz')
         return JsonResponse(list(subtypes), safe=False)
     return JsonResponse([], safe=False)
 
@@ -374,14 +374,14 @@ def get_subtype_extra_fields(request):
     if not sub_type_id:
         return JsonResponse({'extra_fields': []})
     try:
-        sub_type = ElementSubType.objects.get(pk=sub_type_id)
+        sub_type = Element.objects.get(pk=sub_type_id)
         # For Ladice, use the defined mapping (LADICE 1–4); otherwise use DB schema
         if sub_type.type == 'ladice':
             schema = get_ladice_extra_fields_for_sub_type(sub_type)
         else:
             schema = sub_type.extra_fields_schema or []
         return JsonResponse({'extra_fields': schema})
-    except (ElementSubType.DoesNotExist, ValueError):
+    except (Element.DoesNotExist, ValueError):
         return JsonResponse({'extra_fields': []})
 
 
@@ -399,7 +399,7 @@ def get_subtype_elements(request):
             from .models import CalculatedElementSubTypeElement
             
             # Get configuration templates
-            templates = ElementSubTypeElements.objects.filter(element_sub_type_id=sub_type_id)
+            templates = ElementSubType.objects.filter(element_sub_type_id=sub_type_id)
             
             elements_data = []
             for template in templates:
@@ -523,7 +523,7 @@ def update_element_dimensions(request):
             if not element_id:
                 return JsonResponse({'success': False, 'error': 'Missing element_id'}, status=400)
 
-            element = get_object_or_404(Element, id=element_id)
+            element = get_object_or_404(OfferElement, id=element_id)
 
             for attr, val in (('Dx', dx), ('Dy', dy), ('Dz', dz)):
                 if val == '':

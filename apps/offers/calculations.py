@@ -1,8 +1,8 @@
 """
-Calculation service for ElementSubTypeElements dimensions (Dx, Dy, Dz)
+Calculation service for ElementSubType dimensions (Dx, Dy, Dz)
 based on Element dimensions (user input) and Offer coefficient selections.
 
-Each ElementSubTypeElements can have its own formula identified by formula_code.
+Each ElementSubType can have its own formula identified by formula_code.
 """
 from decimal import Decimal
 from typing import Dict, Optional, Callable, TYPE_CHECKING
@@ -10,19 +10,19 @@ from typing import Dict, Optional, Callable, TYPE_CHECKING
 if TYPE_CHECKING:
     from .models import Coefficient
 
-from .models import Element, ElementSubType, ElementSubTypeElements, Offer, OfferCoefficientSelection
+from .models import OfferElement, ElementSubType, Offer, OfferCoefficientSelection
 
 
 class DimensionCalculator:
     """
     Service class for calculating dimensions based on formulas.
     Formulas can be customized per:
-    - ElementSubTypeElements (using formula_code)
+    - ElementSubType (using formula_code)
     - Element type and coefficient group (default formulas)
     """
     
     def __init__(self):
-        # Per-ElementSubTypeElements formula registry
+        # Per-ElementSubType formula registry
         # Format: {formula_code: formula_function}
         # These take precedence over default formulas
         self.element_formulas = {}
@@ -48,20 +48,20 @@ class DimensionCalculator:
     
     def calculate_dimensions(
         self,
-        element: Element,
+        element: OfferElement,
         offer: Offer,
-        element_sub_type_element: Optional[ElementSubTypeElements] = None
+        element_sub_type_element: Optional[ElementSubType] = None
     ) -> Dict[str, Decimal]:
         """
-        Calculate Dx, Dy, Dz for an ElementSubTypeElements based on:
+        Calculate Dx, Dy, Dz for an ElementSubType based on:
         - Element dimensions (Dx, Dy, Dz) - user input from form
         - Offer's selected coefficients
-        - ElementSubTypeElements formula_code (if specified)
+        - ElementSubType formula_code (if specified)
         
         Args:
             element: The Element instance with user-input Dx, Dy, Dz values
             offer: The Offer with coefficient selections
-            element_sub_type_element: Optional ElementSubTypeElements instance (for per-element formulas)
+            element_sub_type_element: Optional ElementSubType instance (for per-element formulas)
             
         Returns:
             Dictionary with 'Dx', 'Dy', 'Dz' as Decimal values
@@ -74,7 +74,7 @@ class DimensionCalculator:
         # Get offer's coefficient selections
         coefficient_selections = self._get_offer_coefficients(offer)
         
-        # Check if this ElementSubTypeElements has a custom formula
+        # Check if this ElementSubType has a custom formula
         formula_code = None
         if element_sub_type_element and element_sub_type_element.formula_code:
             formula_code = element_sub_type_element.formula_code
@@ -84,7 +84,7 @@ class DimensionCalculator:
             import logging
             logger = logging.getLogger(__name__)
             logger.info(
-                f"Using custom formula '{formula_code}' for ElementSubTypeElements {element_sub_type_element.id}"
+                f"Using custom formula '{formula_code}' for ElementSubType {element_sub_type_element.id}"
             )
             formula_func = self.element_formulas[formula_code]
             result = formula_func(
@@ -102,7 +102,7 @@ class DimensionCalculator:
             import logging
             logger = logging.getLogger(__name__)
             logger.warning(
-                f"Formula code '{formula_code}' specified for ElementSubTypeElements {element_sub_type_element.id if element_sub_type_element else 'unknown'}, "
+                f"Formula code '{formula_code}' specified for ElementSubType {element_sub_type_element.id if element_sub_type_element else 'unknown'}, "
                 f"but not found in registered formulas. Available formulas: {list(self.element_formulas.keys())}"
             )
         
@@ -173,8 +173,8 @@ class DimensionCalculator:
         base_dz: Decimal,
         coefficient: 'Coefficient',
         current_result: Dict[str, Decimal],
-        element: Element,
-        element_sub_type_element: Optional[ElementSubTypeElements]
+        element: OfferElement,
+        element_sub_type_element: Optional[ElementSubType]
     ) -> Dict[str, Decimal]:
         """
         Formula for ceiling coefficient.
@@ -197,8 +197,8 @@ class DimensionCalculator:
         base_dz: Decimal,
         coefficient: 'Coefficient',
         current_result: Dict[str, Decimal],
-        element: Element,
-        element_sub_type_element: Optional[ElementSubTypeElements]
+        element: OfferElement,
+        element_sub_type_element: Optional[ElementSubType]
     ) -> Dict[str, Decimal]:
         """
         Formula for floor coefficient.
@@ -220,8 +220,8 @@ class DimensionCalculator:
         base_dz: Decimal,
         coefficient: 'Coefficient',
         current_result: Dict[str, Decimal],
-        element: Element,
-        element_sub_type_element: Optional[ElementSubTypeElements]
+        element: OfferElement,
+        element_sub_type_element: Optional[ElementSubType]
     ) -> Dict[str, Decimal]:
         """
         Formula for back coefficient.
@@ -243,8 +243,8 @@ class DimensionCalculator:
         base_dz: Decimal,
         coefficient: 'Coefficient',
         current_result: Dict[str, Decimal],
-        element: Element,
-        element_sub_type_element: Optional[ElementSubTypeElements]
+        element: OfferElement,
+        element_sub_type_element: Optional[ElementSubType]
     ) -> Dict[str, Decimal]:
         """
         Formula for tier coefficient.
@@ -284,11 +284,11 @@ class DimensionCalculator:
         formula_func: Callable
     ):
         """
-        Register a custom formula for a specific ElementSubTypeElements (identified by formula_code).
+        Register a custom formula for a specific ElementSubType (identified by formula_code).
         This formula will take precedence over default formulas.
         
         Args:
-            formula_code: Unique identifier for this formula (should match ElementSubTypeElements.formula_code)
+            formula_code: Unique identifier for this formula (should match ElementSubType.formula_code)
             formula_func: Function that takes (base_dx, base_dy, base_dz, coefficient_selections, element, element_sub_type_element)
                          and returns a dict with 'Dx', 'Dy', 'Dz'
                          
@@ -309,8 +309,8 @@ def formula_stranica_dimensions_calculation(
     base_dy: Decimal,
     base_dz: Decimal,
     coefficient_selections: Dict[str, 'Coefficient'],
-    element: Element,
-    element_sub_type_element: Optional[ElementSubTypeElements]
+    element: OfferElement,
+    element_sub_type_element: Optional[ElementSubType]
 ) -> Dict[str, Decimal]:
     """
     Custom formula for stranica dimensions calculation.
@@ -322,7 +322,7 @@ def formula_stranica_dimensions_calculation(
         base_dx, base_dy, base_dz: Base dimensions from Element
         coefficient_selections: Dict of {group_code: Coefficient} for selected coefficients
         element: The Element instance
-        element_sub_type_element: The ElementSubTypeElements instance
+        element_sub_type_element: The ElementSubType instance
     
     Returns:
         Dict with calculated Dx, Dy (Dz is not used but included for compatibility)
@@ -371,8 +371,8 @@ def formula_pod_dimensions_calculation(
     base_dy: Decimal,
     base_dz: Decimal,
     coefficient_selections: Dict[str, 'Coefficient'],
-    element: Element,
-    element_sub_type_element: Optional[ElementSubTypeElements]
+    element: OfferElement,
+    element_sub_type_element: Optional[ElementSubType]
 ) -> Dict[str, Decimal]:
     """
     Custom formula for pod dimensions calculation.
@@ -384,7 +384,7 @@ def formula_pod_dimensions_calculation(
         base_dx, base_dy, base_dz: Base dimensions from Element
         coefficient_selections: Dict of {group_code: Coefficient} for selected coefficients
         element: The Element instance
-        element_sub_type_element: The ElementSubTypeElements instance
+        element_sub_type_element: The ElementSubType instance
     
     Returns:
         Dict with calculated Dx, Dy (Dz is not used but included for compatibility)
@@ -433,8 +433,8 @@ def formula_polica_dimensions_calculation(
     base_dy: Decimal,
     base_dz: Decimal,
     coefficient_selections: Dict[str, 'Coefficient'],
-    element: Element,
-    element_sub_type_element: Optional[ElementSubTypeElements]
+    element: OfferElement,
+    element_sub_type_element: Optional[ElementSubType]
 ) -> Dict[str, Decimal]:
     """
     Custom formula for pod dimensions calculation.
@@ -446,7 +446,7 @@ def formula_polica_dimensions_calculation(
         base_dx, base_dy, base_dz: Base dimensions from Element
         coefficient_selections: Dict of {group_code: Coefficient} for selected coefficients
         element: The Element instance
-        element_sub_type_element: The ElementSubTypeElements instance
+        element_sub_type_element: The ElementSubType instance
     
     Returns:
         Dict with calculated Dx, Dy (Dz is not used but included for compatibility)
@@ -497,8 +497,8 @@ def formula_fronta_dimensions_calculation(
     base_dy: Decimal,
     base_dz: Decimal,
     coefficient_selections: Dict[str, 'Coefficient'],
-    element: Element,
-    element_sub_type_element: Optional[ElementSubTypeElements]
+    element: OfferElement,
+    element_sub_type_element: Optional[ElementSubType]
 ) -> Dict[str, Decimal]:
     """
     Custom formula for fronta dimensions calculation.
@@ -510,7 +510,7 @@ def formula_fronta_dimensions_calculation(
         base_dx, base_dy, base_dz: Base dimensions from Element
         coefficient_selections: Dict of {group_code: Coefficient} for selected coefficients
         element: The Element instance
-        element_sub_type_element: The ElementSubTypeElements instance
+        element_sub_type_element: The ElementSubType instance
     
     Returns:
         Dict with calculated Dx, Dy (Dz is not used but included for compatibility)
@@ -558,8 +558,8 @@ def formula_ledja_dimensions_calculation(
     base_dy: Decimal,
     base_dz: Decimal,
     coefficient_selections: Dict[str, 'Coefficient'],
-    element: Element,
-    element_sub_type_element: Optional[ElementSubTypeElements]
+    element: OfferElement,
+    element_sub_type_element: Optional[ElementSubType]
 ) -> Dict[str, Decimal]:
     """
     Custom formula for ledja dimensions calculation.
@@ -571,7 +571,7 @@ def formula_ledja_dimensions_calculation(
         base_dx, base_dy, base_dz: Base dimensions from Element
         coefficient_selections: Dict of {group_code: Coefficient} for selected coefficients
         element: The Element instance
-        element_sub_type_element: The ElementSubTypeElements instance
+        element_sub_type_element: The ElementSubType instance
     
     Returns:
         Dict with calculated Dx, Dy (Dz is not used but included for compatibility)
@@ -618,8 +618,8 @@ def formula_plafonvezac_dimensions_calculation(
     base_dy: Decimal,
     base_dz: Decimal,
     coefficient_selections: Dict[str, 'Coefficient'],
-    element: Element,
-    element_sub_type_element: Optional[ElementSubTypeElements]  
+    element: OfferElement,
+    element_sub_type_element: Optional[ElementSubType]  
 ) -> Dict[str, Decimal]:
     """
     Custom formula for plafonvezac dimensions calculation.
@@ -631,7 +631,7 @@ def formula_plafonvezac_dimensions_calculation(
         base_dx, base_dy, base_dz: Base dimensions from Element
         coefficient_selections: Dict of {group_code: Coefficient} for selected coefficients
         element: The Element instance
-        element_sub_type_element: The ElementSubTypeElements instance
+        element_sub_type_element: The ElementSubType instance
     
     Returns:
         Dict with calculated Dx, Dy (Dz is not used but included for compatibility)
@@ -691,20 +691,20 @@ calculator.register_element_formula('LEDJA_CALCULATION', formula_ledja_dimension
 calculator.register_element_formula('PLAFONVEZAC_CALCULATION', formula_plafonvezac_dimensions_calculation)
 
 def calculate_element_dimensions(
-    element: Element,
+    element: OfferElement,
     offer: Offer,
-    element_sub_type_element: Optional[ElementSubTypeElements] = None
+    element_sub_type_element: Optional[ElementSubType] = None
 ) -> Dict[str, Decimal]:
     """
-    Convenience function to calculate dimensions for ElementSubTypeElements.
+    Convenience function to calculate dimensions for ElementSubType.
     Uses Element.Dx, Dy, Dz (user input) as base dimensions.
     
     Usage:
         from apps.offers.calculations import calculate_element_dimensions
-        from apps.offers.models import Element, ElementSubTypeElements
+        from apps.offers.models import OfferElement, ElementSubType
         
-        element = Element.objects.get(id=1)
-        sub_type_element = ElementSubTypeElements.objects.get(id=1)
+        element = OfferElement.objects.get(id=1)
+        sub_type_element = ElementSubType.objects.get(id=1)
         dimensions = calculate_element_dimensions(element, offer, sub_type_element)
         sub_type_element.Dx = dimensions['Dx']
         sub_type_element.Dy = dimensions['Dy']
