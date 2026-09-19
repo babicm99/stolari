@@ -4,6 +4,8 @@ from django.contrib import messages
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.http import JsonResponse
 from django.db import transaction
+from django.db.models import Count
+from django.db.models.deletion import ProtectedError
 from decimal import Decimal, InvalidOperation
 import json
 from .models import (
@@ -18,7 +20,7 @@ from .models import (
     UserCoefficientPreference,
     Material,
 )
-from .forms import OfferForm, ElementFormSet
+from .forms import OfferForm, ElementFormSet, ElementSubTypeForm
 from .ladice_extra_fields import get_ladice_extra_fields_for_sub_type, LADICE_FIELD_NAMES
 
 
@@ -131,6 +133,91 @@ def offers_list(request):
     }
     
     return render(request, 'pages/apps/offers.html', context)
+
+
+def elements_list(request):
+    """Display list of all element sub types"""
+    sub_types = (
+        ElementSubType.objects.annotate(
+            sub_type_elements_count=Count('sub_type_elements', distinct=True),
+            used_in_offers_count=Count('element', distinct=True),
+        )
+        .order_by('type', 'code')
+    )
+
+    page = request.GET.get('page', 1)
+    paginator = Paginator(sub_types, 10)
+
+    try:
+        sub_types_page = paginator.page(page)
+    except PageNotAnInteger:
+        sub_types_page = paginator.page(1)
+    except EmptyPage:
+        sub_types_page = paginator.page(paginator.num_pages)
+
+    context = {
+        'segment': 'elements',
+        'parent': 'apps',
+        'sub_types': sub_types_page,
+        'total_sub_types': sub_types.count(),
+    }
+
+    return render(request, 'pages/apps/elements.html', context)
+
+
+@login_required(login_url='/accounts/login/basic-login/')
+def element_subtype_create(request):
+    """Create a new element sub type"""
+    if request.method == 'POST':
+        form = ElementSubTypeForm(request.POST, request.FILES)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Element created successfully!')
+            return redirect('offers:elements_list')
+    else:
+        form = ElementSubTypeForm()
+
+    context = {
+        'segment': 'elements',
+        'parent': 'apps',
+        'form': form,
+    }
+
+    return render(request, 'pages/apps/element_form.html', context)
+
+
+@login_required(login_url='/accounts/login/basic-login/')
+def element_subtype_delete(request, pk):
+    """Delete an element sub type"""
+    sub_type = get_object_or_404(ElementSubType, pk=pk)
+    used_in_offers_count = sub_type.element_set.count()
+
+    if request.method == 'POST':
+        if used_in_offers_count:
+            messages.error(
+                request,
+                'This element cannot be deleted because it is used in existing offers.',
+            )
+            return redirect('offers:element_delete', pk=pk)
+        try:
+            sub_type.delete()
+        except ProtectedError:
+            messages.error(
+                request,
+                'This element cannot be deleted because it is used in existing offers.',
+            )
+            return redirect('offers:elements_list')
+        messages.success(request, 'Element deleted successfully!')
+        return redirect('offers:elements_list')
+
+    context = {
+        'segment': 'elements',
+        'parent': 'apps',
+        'sub_type': sub_type,
+        'used_in_offers_count': used_in_offers_count,
+    }
+
+    return render(request, 'pages/apps/element_confirm_delete.html', context)
 
 
 @login_required(login_url='/accounts/login/basic-login/')

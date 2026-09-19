@@ -5,6 +5,9 @@ app_name = 'offers'
 
 urlpatterns = [
     path('', views.offers_list, name='list'),
+    path('elements/', views.elements_list, name='elements_list'),
+    path('elements/create/', views.element_subtype_create, name='element_create'),
+    path('elements/delete/<int:pk>/', views.element_subtype_delete, name='element_delete'),
     path('create/', views.offer_create, name='create'),
     path('detail/<int:pk>/', views.offer_detail, name='detail'),
     path('edit/<int:pk>/', views.offer_edit, name='edit'),

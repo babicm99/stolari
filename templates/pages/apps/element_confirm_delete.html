@@ -1,0 +1,64 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block content %}
+
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card my-4">
+                <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+                    <div class="bg-gradient-danger shadow-primary border-radius-lg pt-4 pb-3">
+                        <h6 class="text-white text-capitalize ps-3">Delete Element</h6>
+                    </div>
+                </div>
+                <div class="card-body px-4 pb-2">
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    {% if used_in_offers_count %}
+                    <div class="alert alert-danger" role="alert">
+                        <h5 class="alert-heading">This element cannot be deleted</h5>
+                        <p class="mb-0">It is used in {{ used_in_offers_count }} offer element{{ used_in_offers_count|pluralize }}. Remove those offer items first, then try again.</p>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-warning" role="alert">
+                        <h5 class="alert-heading">Are you sure you want to delete this element?</h5>
+                        <p>This action cannot be undone. Configured sub elements for this type will also be deleted.</p>
+                    </div>
+                    {% endif %}
+
+                    <div class="mb-3">
+                        <p class="mb-0">
+                            <strong>Code:</strong> {{ sub_type.code }}<br>
+                            {% if sub_type.name %}<strong>Name:</strong> {{ sub_type.name }}<br>{% endif %}
+                            <strong>Type:</strong> {{ sub_type.get_type_display }}
+                        </p>
+                    </div>
+
+                    <form method="post" class="mt-3">
+                        {% csrf_token %}
+                        <div class="d-flex justify-content-end gap-2">
+                            <a href="{% url 'offers:elements_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-times me-2"></i>Cancel
+                            </a>
+                            {% if not used_in_offers_count %}
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-trash me-2"></i>Delete Element
+                            </button>
+                            {% endif %}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock content %}

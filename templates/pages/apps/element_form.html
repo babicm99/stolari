@@ -1,0 +1,115 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block content %}
+
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card my-4">
+                <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2">
+                    <div class="bg-gradient-primary shadow-primary border-radius-lg pt-4 pb-3">
+                        <div class="d-flex justify-content-between align-items-center px-4">
+                            <h6 class="text-white text-capitalize ps-3">Create Element</h6>
+                            <a href="{% url 'offers:elements_list' %}" class="btn btn-light btn-sm mb-0">
+                                <i class="fas fa-arrow-left me-2"></i>Back to Elements
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body px-4 pb-2">
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <form method="post" enctype="multipart/form-data" class="mt-3">
+                        {% csrf_token %}
+                        {{ form.non_field_errors }}
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.type.id_for_label }}" class="form-label">
+                                    {{ form.type.label }}
+                                    <span class="text-danger">*</span>
+                                </label>
+                                {{ form.type }}
+                                {% if form.type.errors %}
+                                    <div class="text-danger small">{{ form.type.errors }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.code.id_for_label }}" class="form-label">
+                                    {{ form.code.label }}
+                                    <span class="text-danger">*</span>
+                                </label>
+                                {{ form.code }}
+                                {% if form.code.errors %}
+                                    <div class="text-danger small">{{ form.code.errors }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-12 mb-3">
+                                <label for="{{ form.name.id_for_label }}" class="form-label">
+                                    {{ form.name.label }}
+                                </label>
+                                {{ form.name }}
+                                {% if form.name.errors %}
+                                    <div class="text-danger small">{{ form.name.errors }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-4 mb-3">
+                                <label for="{{ form.Dx.id_for_label }}" class="form-label">Dx</label>
+                                {{ form.Dx }}
+                                {% if form.Dx.errors %}
+                                    <div class="text-danger small">{{ form.Dx.errors }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-4 mb-3">
+                                <label for="{{ form.Dy.id_for_label }}" class="form-label">Dy</label>
+                                {{ form.Dy }}
+                                {% if form.Dy.errors %}
+                                    <div class="text-danger small">{{ form.Dy.errors }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-4 mb-3">
+                                <label for="{{ form.Dz.id_for_label }}" class="form-label">Dz</label>
+                                {{ form.Dz }}
+                                {% if form.Dz.errors %}
+                                    <div class="text-danger small">{{ form.Dz.errors }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-12 mb-3">
+                                <label for="{{ form.image.id_for_label }}" class="form-label">
+                                    {{ form.image.label }}
+                                </label>
+                                {{ form.image }}
+                                {% if form.image.errors %}
+                                    <div class="text-danger small">{{ form.image.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-end gap-2 mt-4 mb-3">
+                            <a href="{% url 'offers:elements_list' %}" class="btn btn-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i>Create Element
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock content %}

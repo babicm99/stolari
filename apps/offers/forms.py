@@ -5,6 +5,21 @@ from django.db.models import Q
 from .models import Offer, Element, ElementSubType, ElementType, Material
 
 
+class ElementSubTypeForm(forms.ModelForm):
+    class Meta:
+        model = ElementSubType
+        fields = ['type', 'code', 'name', 'Dx', 'Dy', 'Dz', 'image']
+        widgets = {
+            'type': forms.Select(attrs={'class': 'form-control'}),
+            'code': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. DE1V'}),
+            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter name'}),
+            'Dx': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': 'Dx'}),
+            'Dy': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': 'Dy'}),
+            'Dz': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': 'Dz'}),
+            'image': forms.ClearableFileInput(attrs={'class': 'form-control'}),
+        }
+
+
 class OfferForm(forms.ModelForm):
     class Meta:
         model = Offer
