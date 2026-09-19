@@ -121,6 +121,47 @@ class Offer(models.Model):
             'total': updated_count + error_count
         }
 
+class Distributor(models.Model):
+    name = models.CharField(max_length=255, verbose_name=_('Name'))
+    city = models.CharField(max_length=100, verbose_name=_('City'), blank=True)
+    country = models.CharField(max_length=100, verbose_name=_('Country'), blank=True)
+
+    class Meta:
+        verbose_name = _('Distributor')
+        verbose_name_plural = _('Distributors')
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
+class Material(models.Model):
+    code = models.IntegerField(unique=True, verbose_name=_('Code'))
+    name = models.CharField(max_length=255, verbose_name=_('Name'))
+    vp_price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_('VP Price'))
+    mp_price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_('MP Price'))
+    jm = models.CharField(max_length=5, verbose_name=_('JM'))
+    Dx = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name=_('Dx'))
+    Dy = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name=_('Dy'))
+    Dz = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name=_('Dz'))
+    distributor = models.ForeignKey(
+        Distributor,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='materials',
+        verbose_name=_('Distributor'),
+    )
+
+    class Meta:
+        verbose_name = _('Material')
+        verbose_name_plural = _('Materials')
+        ordering = ['code']
+
+    def __str__(self):
+        return f"{self.code} – {self.name}"
+
+
 class ElementType(models.TextChoices):
     DONJI = 'donji_elementi', 'Donji elementi'
     GORNI = 'gornji_elementi', 'Gornji elementi'
@@ -171,6 +212,14 @@ class Element(models.Model):
         limit_choices_to=models.Q(type=models.F('type'))
     )
 
+    material = models.ForeignKey(
+        'Material',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='elements',
+        verbose_name=_('Material'),
+    )
     quantity = models.PositiveIntegerField(default=1)
     Dx = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True, verbose_name='Dx')
     Dy = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True, verbose_name='Dy')
@@ -318,6 +367,29 @@ class OfferCoefficientSelection(models.Model):
 
     def __str__(self):
         return f"{self.offer} → {self.coefficient}"
+
+
+class UserMaterialPreference(models.Model):
+    """Per-user material filter: one country, multiple cities, multiple distributors."""
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name='material_preference',
+    )
+    country = models.CharField(max_length=100, blank=True, default='')
+    cities = models.JSONField(default=list, blank=True)
+    distributors = models.ManyToManyField(
+        'Distributor',
+        blank=True,
+        related_name='user_preferences',
+    )
+
+    class Meta:
+        verbose_name = 'User Material Preference'
+        verbose_name_plural = 'User Material Preferences'
+
+    def __str__(self):
+        return f"{self.user} – {self.country}"
 
 
 class UserCoefficientPreference(models.Model):

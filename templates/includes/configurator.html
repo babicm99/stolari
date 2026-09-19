@@ -64,6 +64,40 @@
         <div class="form-check form-switch ps-0 d-xl-block d-none">
           <input class="form-check-input mt-1 ms-auto" type="checkbox" id="dark-version" onclick="darkMode(this)" {% if user.is_authenticated and user.profile.dark_mode %}checked{% endif %}>
         </div>
+        {% if user.is_authenticated and material_countries %}
+        <hr class="horizontal dark my-sm-4">
+        <div class="mt-3">
+          <h6 class="mb-0">Material filter (your profile)</h6>
+          <p class="text-sm">Filter which materials appear when building offers.</p>
+        </div>
+
+        <!-- Country (single select) -->
+        <div class="mt-2">
+          <label class="form-label text-xs font-weight-bold mb-1">Country</label>
+          <select id="mat-pref-country" class="form-control form-control-sm">
+            <option value="">— all —</option>
+            {% for c in material_countries %}
+            <option value="{{ c }}" {% if user_material_preference.country == c %}selected{% endif %}>{{ c }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Cities (multi-checkbox, loaded by JS) -->
+        <div class="mt-2" id="mat-pref-cities-wrap" style="display:none;">
+          <label class="form-label text-xs font-weight-bold mb-1">Cities</label>
+          <div id="mat-pref-cities-list"></div>
+        </div>
+
+        <!-- Distributors (multi-checkbox, loaded by JS) -->
+        <div class="mt-2" id="mat-pref-distributors-wrap" style="display:none;">
+          <label class="form-label text-xs font-weight-bold mb-1">Distributors</label>
+          <div id="mat-pref-distributors-list"></div>
+        </div>
+
+        <button id="mat-pref-save-btn" class="btn btn-primary btn-sm w-100 mt-3" style="display:none;">Save material filter</button>
+        <p id="mat-pref-saved-msg" class="text-success text-xs mt-1" style="display:none;">Saved!</p>
+        {% endif %}
+
         {% if user.is_authenticated and user_coefficient_groups %}
         <hr class="horizontal dark my-sm-4">
         <div class="mt-3">
@@ -98,3 +132,148 @@
         </div>
     </div>
 </div>
+
+{% if user.is_authenticated and material_countries %}
+<script>
+(function () {
+  const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]') ?
+        document.querySelector('[name=csrfmiddlewaretoken]').value :
+        '{{ csrf_token }}';
+
+  const savedPref = {
+    country: '{{ user_material_preference.country|escapejs }}',
+    cities: {{ user_material_preference.cities|safe }},
+    distributorIds: {{ user_material_preference.distributor_ids|safe }},
+  };
+
+  const countrySelect      = document.getElementById('mat-pref-country');
+  const citiesWrap         = document.getElementById('mat-pref-cities-wrap');
+  const citiesList         = document.getElementById('mat-pref-cities-list');
+  const distributorsWrap   = document.getElementById('mat-pref-distributors-wrap');
+  const distributorsList   = document.getElementById('mat-pref-distributors-list');
+  const saveBtn            = document.getElementById('mat-pref-save-btn');
+  const savedMsg           = document.getElementById('mat-pref-saved-msg');
+
+  function checkedValues(container, name) {
+    return Array.from(container.querySelectorAll(`input[name="${name}"]:checked`)).map(el => el.value);
+  }
+
+  function buildCheckboxes(container, items, name, selectedValues) {
+    container.innerHTML = '';
+    items.forEach(item => {
+      const id  = `${name}_${item.value ?? item}`;
+      const val = item.value ?? item;
+      const lbl = item.label ?? item;
+      const checked = selectedValues.includes(String(val)) ? 'checked' : '';
+      container.insertAdjacentHTML('beforeend',
+        `<div class="form-check mb-1">
+           <input class="form-check-input" type="checkbox" name="${name}" id="${id}" value="${val}" ${checked}>
+           <label class="form-check-label text-xs" for="${id}">${lbl}</label>
+         </div>`
+      );
+    });
+  }
+
+  function loadDistributors(country, cities, selectedIds) {
+    if (!country) { distributorsWrap.style.display = 'none'; return; }
+    const params = new URLSearchParams();
+    params.set('country', country);
+    cities.forEach(c => params.append('cities[]', c));
+    fetch(`{% url 'get_material_distributors' %}?${params}`)
+      .then(r => r.json())
+      .then(data => {
+        if (!data.distributors.length) { distributorsWrap.style.display = 'none'; return; }
+        buildCheckboxes(distributorsList, data.distributors.map(d => ({value: d.id, label: d.name})),
+                        'mat_distributor', selectedIds.map(String));
+        distributorsWrap.style.display = 'block';
+        saveBtn.style.display = 'block';
+      });
+  }
+
+  function loadCities(country, selectedCities, selectedDistributorIds) {
+    if (!country) {
+      citiesWrap.style.display = 'none';
+      distributorsWrap.style.display = 'none';
+      saveBtn.style.display = 'none';
+      return;
+    }
+    fetch(`{% url 'get_material_cities' %}?country=${encodeURIComponent(country)}`)
+      .then(r => r.json())
+      .then(data => {
+        if (!data.cities.length) { citiesWrap.style.display = 'none'; return; }
+        buildCheckboxes(citiesList, data.cities, 'mat_city', selectedCities);
+        citiesWrap.style.display = 'block';
+        saveBtn.style.display = 'block';
+        // Only load distributors if there are pre-selected cities to restore
+        if (selectedCities.length) {
+          loadDistributors(country, selectedCities, selectedDistributorIds);
+        } else {
+          distributorsWrap.style.display = 'none';
+        }
+      });
+  }
+
+  // City checkboxes change → reload distributors
+  citiesList.addEventListener('change', function () {
+    const country = countrySelect.value;
+    const cities  = checkedValues(citiesList, 'mat_city');
+    if (cities.length) {
+      loadDistributors(country, cities, checkedValues(distributorsList, 'mat_distributor'));
+    } else {
+      distributorsWrap.style.display = 'none';
+    }
+  });
+
+  // Country change → reload cities + distributors
+  countrySelect.addEventListener('change', function () {
+    loadCities(this.value, [], []);
+  });
+
+  // Save button
+  saveBtn.addEventListener('click', function () {
+    const country      = countrySelect.value;
+    const cities       = checkedValues(citiesList, 'mat_city');
+    const distributors = checkedValues(distributorsList, 'mat_distributor');
+
+    const body = new URLSearchParams();
+    body.set('csrfmiddlewaretoken', csrfToken);
+    body.set('country', country);
+    cities.forEach(c => body.append('cities[]', c));
+    distributors.forEach(d => body.append('distributors[]', d));
+
+    fetch('{% url "save_material_preference" %}', {
+      method: 'POST',
+      headers: {'X-Requested-With': 'XMLHttpRequest'},
+      body: body,
+    })
+    .then(r => {
+      if (!r.ok) throw new Error('Server error ' + r.status);
+      return r.json();
+    })
+    .then(data => {
+      if (data.success) {
+        const d = data.saved;
+        savedMsg.textContent = `Saved! (${d.distributor_ids.length} distributor(s))`;
+        savedMsg.className = 'text-success text-xs mt-1';
+      } else {
+        savedMsg.textContent = 'Error: ' + (data.error || 'unknown');
+        savedMsg.className = 'text-danger text-xs mt-1';
+      }
+      savedMsg.style.display = 'block';
+      setTimeout(() => savedMsg.style.display = 'none', 3000);
+    })
+    .catch(err => {
+      savedMsg.textContent = 'Failed: ' + err.message;
+      savedMsg.className = 'text-danger text-xs mt-1';
+      savedMsg.style.display = 'block';
+      setTimeout(() => savedMsg.style.display = 'none', 4000);
+    });
+  });
+
+  // Init: restore saved preference
+  if (savedPref.country) {
+    loadCities(savedPref.country, savedPref.cities.map(String), savedPref.distributorIds.map(String));
+  }
+})();
+</script>
+{% endif %}

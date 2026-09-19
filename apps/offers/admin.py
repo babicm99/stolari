@@ -10,6 +10,9 @@ from .models import (
     Coefficient,
     OfferCoefficientSelection,
     UserCoefficientPreference,
+    Distributor,
+    Material,
+    UserMaterialPreference,
 )
 
 
@@ -60,12 +63,12 @@ class ElementSubTypeAdmin(admin.ModelAdmin):
 
 @admin.register(Element)
 class ElementAdmin(admin.ModelAdmin):
-    list_display = ['offer', 'element_type', 'sub_type', 'quantity', 'Dx', 'Dy', 'Dz', 'dubina_ladice', 'visina_fronte_1']
+    list_display = ['offer', 'element_type', 'sub_type', 'material', 'quantity', 'Dx', 'Dy', 'Dz', 'dubina_ladice', 'visina_fronte_1']
     list_filter = ['element_type']
     autocomplete_fields = ['sub_type']
     fieldsets = (
         (_('Basic Information'), {
-            'fields': ('offer', 'element_type', 'sub_type', 'quantity')
+            'fields': ('offer', 'element_type', 'sub_type', 'material', 'quantity')
         }),
         (_('Dimensions'), {
             'fields': ('Dx', 'Dy', 'Dz'),
@@ -160,3 +163,35 @@ class UserCoefficientPreferenceAdmin(admin.ModelAdmin):
     list_filter = ('group',)
     search_fields = ('user__username', 'group__name', 'coefficient__name')
     raw_id_fields = ('user', 'group', 'coefficient')
+
+
+@admin.register(UserMaterialPreference)
+class UserMaterialPreferenceAdmin(admin.ModelAdmin):
+    list_display = ('user', 'country', 'cities')
+    search_fields = ('user__username', 'country')
+    filter_horizontal = ('distributors',)
+
+
+@admin.register(Distributor)
+class DistributorAdmin(admin.ModelAdmin):
+    list_display = ('name', 'city', 'country', )
+    search_fields = ('name', 'city', 'country')
+
+
+@admin.register(Material)
+class MaterialAdmin(admin.ModelAdmin):
+    list_display = ('code', 'name', 'jm', 'vp_price', 'mp_price', 'Dx', 'Dy', 'Dz', 'distributor')
+    list_filter = ('distributor',)
+    search_fields = ('code', 'name', 'distributor__name')
+    raw_id_fields = ('distributor',)
+    fieldsets = (
+        (None, {
+            'fields': ('code', 'name', 'jm', 'distributor')
+        }),
+        (_('Pricing'), {
+            'fields': ('vp_price', 'mp_price')
+        }),
+        (_('Dimensions'), {
+            'fields': ('Dx', 'Dy', 'Dz')
+        }),
+    )

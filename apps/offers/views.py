@@ -5,6 +5,7 @@ from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.http import JsonResponse
 from django.db import transaction
 from decimal import Decimal, InvalidOperation
+import json
 from .models import (
     Offer,
     Element,
@@ -15,9 +16,40 @@ from .models import (
     Coefficient,
     OfferCoefficientSelection,
     UserCoefficientPreference,
+    Material,
 )
 from .forms import OfferForm, ElementFormSet
 from .ladice_extra_fields import get_ladice_extra_fields_for_sub_type, LADICE_FIELD_NAMES
+
+
+def _material_qs_for_user(user):
+    """Return a Material queryset filtered by the user's material preference.
+
+    Priority:
+      1. If distributors are selected → filter by those distributors only.
+      2. Else if cities are selected  → filter by distributor city.
+      3. Else if country is selected  → filter by distributor country.
+      4. Otherwise                    → return all materials.
+    """
+    qs = Material.objects.select_related('distributor').order_by('code')
+    try:
+        pref = user.material_preference
+        dist_ids = list(pref.distributors.values_list('id', flat=True))
+        if dist_ids:
+            qs = qs.filter(distributor_id__in=dist_ids)
+        elif pref.cities:
+            qs = qs.filter(distributor__city__in=pref.cities)
+        elif pref.country:
+            qs = qs.filter(distributor__country=pref.country)
+    except Exception:
+        pass
+    return qs
+
+
+def _materials_json_for_user(user):
+    """Serialise the user-filtered material queryset to JSON for the template."""
+    qs = _material_qs_for_user(user)
+    return json.dumps(list(qs.values('id', 'code', 'name', 'distributor__name')))
 
 
 def _save_elements_ladice_fields(formset, request):
@@ -104,10 +136,11 @@ def offers_list(request):
 @login_required(login_url='/accounts/login/basic-login/')
 def offer_create(request):
     """Create a new offer with elements"""
+    material_qs = _material_qs_for_user(request.user)
     if request.method == 'POST':
         form = OfferForm(request.POST)
-        formset = ElementFormSet(request.POST)
-        
+        formset = ElementFormSet(request.POST, form_kwargs={'material_qs': material_qs})
+
         if form.is_valid() and formset.is_valid():
             offer = form.save(commit=False)
             offer.created_by = request.user
@@ -136,18 +169,19 @@ def offer_create(request):
             return redirect('offers:detail', pk=offer.pk)
     else:
         form = OfferForm()
-        formset = ElementFormSet()
-    
+        formset = ElementFormSet(form_kwargs={'material_qs': material_qs})
+
     context = {
         'segment': 'offers',
         'parent': 'apps',
         'form': form,
         'formset': formset,
         'action': 'Create',
-        'current_offer_id': None,  # No offer ID for new offers initially
-        'offer': None,  # No offer object for new offers
+        'current_offer_id': None,
+        'offer': None,
+        'materials_json': _materials_json_for_user(request.user),
     }
-    
+
     return render(request, 'pages/apps/offer_form.html', context)
 
 
@@ -155,10 +189,11 @@ def offer_create(request):
 def offer_edit(request, pk):
     """Edit an existing offer with elements"""
     offer = get_object_or_404(Offer, pk=pk)
-    
+    material_qs = _material_qs_for_user(request.user)
+
     if request.method == 'POST':
         form = OfferForm(request.POST, instance=offer)
-        formset = ElementFormSet(request.POST, instance=offer)
+        formset = ElementFormSet(request.POST, instance=offer, form_kwargs={'material_qs': material_qs})
         
         if form.is_valid() and formset.is_valid():
             form.save()
@@ -187,8 +222,8 @@ def offer_edit(request, pk):
             return redirect('offers:detail', pk=offer.pk)
     else:
         form = OfferForm(instance=offer)
-        formset = ElementFormSet(instance=offer)
-    
+        formset = ElementFormSet(instance=offer, form_kwargs={'material_qs': material_qs})
+
     context = {
         'segment': 'offers',
         'parent': 'apps',
@@ -196,9 +231,10 @@ def offer_edit(request, pk):
         'formset': formset,
         'offer': offer,
         'action': 'Edit',
-        'current_offer_id': pk,  # Pass directly to template
+        'current_offer_id': pk,
+        'materials_json': _materials_json_for_user(request.user),
     }
-    
+
     return render(request, 'pages/apps/offer_form.html', context)
 
 
@@ -373,133 +409,69 @@ def update_coefficient(request):
 
 @login_required(login_url='/accounts/login/basic-login/')
 def auto_save_offer(request):
-    """
-    Auto-save offer when creating new offer. This enables coefficient selection.
-    Called when first element is added to a new offer.
-    """
+    """Auto-save offer on first element add so coefficient selection works."""
     if request.method == 'POST' and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         try:
             title = request.POST.get('title', 'New Offer')
-            
-            # Create a new offer
-            offer = Offer.objects.create(
-                title=title,
-                created_by=request.user,
-                is_active=True
-            )
-            
-            # Auto-select default coefficients
+            offer = Offer.objects.create(title=title, created_by=request.user, is_active=True)
             _set_default_coefficients_for_offer(offer)
-            
-            return JsonResponse({
-                'success': True,
-                'offer_id': offer.id,
-                'message': 'Offer auto-saved successfully'
-            })
+            return JsonResponse({'success': True, 'offer_id': offer.id})
         except Exception as e:
             import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Error auto-saving offer: {e}")
+            logging.getLogger(__name__).error(f"Error auto-saving offer: {e}")
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
-    
     return JsonResponse({'success': False, 'error': 'Invalid request'}, status=400)
 
 
 @login_required(login_url='/accounts/login/basic-login/')
 def update_element_dimensions(request):
-    """
-    Update Element dimensions (Dx, Dy, Dz) via AJAX and trigger recalculation.
-    """
+    """Update Element dimensions (Dx, Dy, Dz) via AJAX."""
     if request.method == 'POST' and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         try:
             element_id = request.POST.get('element_id')
             dx = request.POST.get('Dx')
             dy = request.POST.get('Dy')
             dz = request.POST.get('Dz')
-            
+
             if not element_id:
                 return JsonResponse({'success': False, 'error': 'Missing element_id'}, status=400)
-            
-            # Get the element
+
             element = get_object_or_404(Element, id=element_id)
-            
-            # Update dimensions (convert empty strings to None)
-            if dx == '':
-                element.Dx = None
-            elif dx is not None:
-                try:
-                    element.Dx = Decimal(dx)
-                except (ValueError, InvalidOperation):
-                    return JsonResponse({'success': False, 'error': f'Invalid Dx value: {dx}'}, status=400)
-            
-            if dy == '':
-                element.Dy = None
-            elif dy is not None:
-                try:
-                    element.Dy = Decimal(dy)
-                except (ValueError, InvalidOperation):
-                    return JsonResponse({'success': False, 'error': f'Invalid Dy value: {dy}'}, status=400)
-            
-            if dz == '':
-                element.Dz = None
-            elif dz is not None:
-                try:
-                    element.Dz = Decimal(dz)
-                except (ValueError, InvalidOperation):
-                    return JsonResponse({'success': False, 'error': f'Invalid Dz value: {dz}'}, status=400)
-            
-            # Save the element (calculation will be triggered when form is saved)
+
+            for attr, val in (('Dx', dx), ('Dy', dy), ('Dz', dz)):
+                if val == '':
+                    setattr(element, attr, None)
+                elif val is not None:
+                    try:
+                        setattr(element, attr, Decimal(val))
+                    except (ValueError, InvalidOperation):
+                        return JsonResponse({'success': False, 'error': f'Invalid {attr} value: {val}'}, status=400)
+
             element.save(update_fields=['Dx', 'Dy', 'Dz'])
-            
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.info(
-                f"Element {element.id} dimensions updated: Dx={element.Dx}, Dy={element.Dy}, Dz={element.Dz}"
-            )
-            
             return JsonResponse({
                 'success': True,
                 'element_id': element.id,
                 'Dx': float(element.Dx) if element.Dx else None,
                 'Dy': float(element.Dy) if element.Dy else None,
                 'Dz': float(element.Dz) if element.Dz else None,
-                'message': 'Element dimensions updated. Calculations will run when you save the offer.'
             })
-            
         except Exception as e:
             import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Error updating element dimensions: {e}")
+            logging.getLogger(__name__).error(f"Error updating element dimensions: {e}")
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
-    
     return JsonResponse({'success': False, 'error': 'Invalid request'}, status=400)
 
 
 @login_required(login_url='/accounts/login/basic-login/')
 def recalculate_dimensions(request, pk):
-    """
-    Manually trigger recalculation of dimensions for all ElementSubTypeElements
-    in an offer. Useful when formulas change or for bulk updates.
-    """
+    """Manually trigger dimension recalculation for an offer."""
     if request.method == 'POST' and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         try:
             offer = get_object_or_404(Offer, pk=pk)
             result = offer.recalculate_all_element_dimensions()
-            
-            return JsonResponse({
-                'success': True,
-                'message': 'Dimensions recalculated successfully',
-                'stats': result
-            })
+            return JsonResponse({'success': True, 'message': 'Dimensions recalculated successfully', 'stats': result})
         except Exception as e:
             import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Error recalculating dimensions: {e}")
-            return JsonResponse({
-                'success': False,
-                'error': str(e)
-            }, status=400)
-    
+            logging.getLogger(__name__).error(f"Error recalculating dimensions: {e}")
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
     return JsonResponse({'success': False, 'error': 'Invalid request'}, status=400)
-
-

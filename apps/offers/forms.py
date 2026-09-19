@@ -2,7 +2,7 @@ from django import forms
 from django.forms import inlineformset_factory
 from django.utils import timezone
 from django.db.models import Q
-from .models import Offer, Element, ElementSubType, ElementType
+from .models import Offer, Element, ElementSubType, ElementType, Material
 
 
 class OfferForm(forms.ModelForm):
@@ -32,10 +32,11 @@ class OfferForm(forms.ModelForm):
 class ElementForm(forms.ModelForm):
     class Meta:
         model = Element
-        fields = ['element_type', 'sub_type', 'quantity', 'Dx', 'Dy', 'Dz']
+        fields = ['element_type', 'sub_type', 'material', 'quantity', 'Dx', 'Dy', 'Dz']
         widgets = {
             'element_type': forms.Select(attrs={'class': 'form-control element-type-select'}),
             'sub_type': forms.Select(attrs={'class': 'form-control element-subtype-select'}),
+            'material': forms.Select(attrs={'class': 'form-control element-material-select'}),
             'quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': '1', 'value': '1'}),
             'Dx': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': 'Dx'}),
             'Dy': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': 'Dy'}),
@@ -43,8 +44,15 @@ class ElementForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        material_qs = kwargs.pop('material_qs', None)
         super(ElementForm, self).__init__(*args, **kwargs)
         self.fields['element_type'].choices = [('', '---------')] + list(ElementType.choices)
+        self.fields['material'].queryset = (
+            material_qs if material_qs is not None
+            else Material.objects.select_related('distributor').order_by('code')
+        )
+        self.fields['material'].required = False
+        self.fields['material'].empty_label = '---------'
         
         # Filter sub_type based on element_type
         element_type = None

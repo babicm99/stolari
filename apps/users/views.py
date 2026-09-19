@@ -7,7 +7,10 @@ from django.http import JsonResponse
 
 from apps.users.models import Profile
 from apps.users.forms import ProfileForm, QuillFieldForm
-from apps.offers.models import Coefficient, CoefficientGroup, UserCoefficientPreference
+from apps.offers.models import (
+    Coefficient, CoefficientGroup, UserCoefficientPreference,
+    Distributor, UserMaterialPreference,
+)
 
 # Create your views here.
 
@@ -104,6 +107,60 @@ def update_coefficient_preference(request):
         )
     except Exception as e:
         return JsonResponse({"success": False, "error": str(e)}, status=400)
+
+
+@login_required(login_url='/accounts/login/basic-login/')
+def get_material_cities(request):
+    """AJAX: distinct cities available for the given country from the Distributor table."""
+    country = request.GET.get('country', '').strip()
+    qs = Distributor.objects.filter(materials__isnull=False).exclude(city='')
+    if country:
+        qs = qs.filter(country=country)
+    cities = sorted(qs.values_list('city', flat=True).distinct())
+    return JsonResponse({'cities': list(cities)})
+
+
+@login_required(login_url='/accounts/login/basic-login/')
+def get_material_distributors(request):
+    """AJAX: distributors available for the given country + cities."""
+    country = request.GET.get('country', '').strip()
+    cities = [c for c in request.GET.getlist('cities[]') if c]
+    qs = Distributor.objects.filter(materials__isnull=False)
+    if country:
+        qs = qs.filter(country=country)
+    if cities:
+        qs = qs.filter(city__in=cities)
+    distributors = list(qs.distinct().order_by('name').values('id', 'name'))
+    return JsonResponse({'distributors': distributors})
+
+
+@login_required(login_url='/accounts/login/basic-login/')
+def save_material_preference(request):
+    """AJAX: save the user's material filter preference (country, cities, distributors)."""
+    if request.method != 'POST' or request.headers.get('X-Requested-With') != 'XMLHttpRequest':
+        return JsonResponse({'success': False, 'error': 'Invalid request'}, status=400)
+
+    country = request.POST.get('country', '').strip()
+    cities = [c for c in request.POST.getlist('cities[]') if c]
+    distributor_ids = [d for d in request.POST.getlist('distributors[]') if d]
+
+    try:
+        pref, _ = UserMaterialPreference.objects.get_or_create(user=request.user)
+        pref.country = country
+        pref.cities = cities
+        pref.save()
+        pref.distributors.set(Distributor.objects.filter(id__in=distributor_ids))
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+    return JsonResponse({
+        'success': True,
+        'saved': {
+            'country': pref.country,
+            'cities': pref.cities,
+            'distributor_ids': list(pref.distributors.values_list('id', flat=True)),
+        }
+    })
 
 
 @login_required(login_url='/accounts/login/basic-login/')

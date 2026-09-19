@@ -115,6 +115,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'apps.users.context_processors.coefficient_groups',
+                'apps.users.context_processors.material_preference',
             ],
         },
     },

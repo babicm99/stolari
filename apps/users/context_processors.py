@@ -5,6 +5,8 @@ from apps.offers.models import (
     OfferCoefficientSelection,
     Offer,
     UserCoefficientPreference,
+    Distributor,
+    UserMaterialPreference,
 )
 
 
@@ -104,3 +106,34 @@ def coefficient_groups(request):
         )
 
     return context
+
+
+def material_preference(request):
+    """
+    Provides material filter options + the user's saved preference to every page.
+    Used by the configurator sidebar.
+    """
+    ctx = {
+        'material_countries': [],
+        'user_material_preference': {'country': '', 'cities': [], 'distributor_ids': []},
+    }
+    if not request.user.is_authenticated:
+        return ctx
+
+    # All distinct countries from distributors that have materials
+    ctx['material_countries'] = sorted(
+        Distributor.objects.filter(materials__isnull=False).exclude(country='')
+        .values_list('country', flat=True).distinct()
+    )
+
+    try:
+        pref = request.user.material_preference
+        ctx['user_material_preference'] = {
+            'country': pref.country,
+            'cities': pref.cities,
+            'distributor_ids': list(pref.distributors.values_list('id', flat=True)),
+        }
+    except UserMaterialPreference.DoesNotExist:
+        pass
+
+    return ctx

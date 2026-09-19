@@ -210,7 +210,7 @@
                                                     <div class="text-danger small">{{ form.sub_type.errors }}</div>
                                                 {% endif %}
                                             </div>
-                                            
+
                                             <div class="col-md-4 mb-3">
                                                 <label for="{{ form.quantity.id_for_label }}" class="form-label">
                                                     Quantity <span class="text-danger">*</span>
@@ -218,6 +218,18 @@
                                                 {{ form.quantity }}
                                                 {% if form.quantity.errors %}
                                                     <div class="text-danger small">{{ form.quantity.errors }}</div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+
+                                        <div class="row material-row">
+                                            <div class="col-md-12 mb-3">
+                                                <label for="{{ form.material.id_for_label }}" class="form-label">
+                                                    Material
+                                                </label>
+                                                {{ form.material }}
+                                                {% if form.material.errors %}
+                                                    <div class="text-danger small">{{ form.material.errors }}</div>
                                                 {% endif %}
                                             </div>
                                         </div>
@@ -361,6 +373,17 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+    const MATERIALS = {{ materials_json|safe }};
+
+    function buildMaterialOptions() {
+        let html = '<option value="">---------</option>';
+        MATERIALS.forEach(m => {
+            const dist = m.distributor__name ? ` (${m.distributor__name})` : '';
+            html += `<option value="${m.id}">${m.code} – ${m.name}${dist}</option>`;
+        });
+        return html;
+    }
+
     // Load and show extra fields for Ladice (or other types) based on sub_type
     function loadExtraFieldsForRow(formRow) {
         const formIndex = formRow.getAttribute('data-form-index');
@@ -454,7 +477,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 autoFillDimensions(this);
                 loadExtraFieldsForRow(formRow);
             });
-            
+
             // If sub_type already has a value (editing existing form), auto-fill dimensions and extra fields
             if (subTypeSelect.value) {
                 autoFillDimensions(subTypeSelect);
@@ -496,6 +519,14 @@ document.addEventListener('DOMContentLoaded', function() {
                             <input type="number" name="elements-${formCount}-quantity" class="form-control" id="id_elements-${formCount}-quantity" min="1" value="1" required>
                         </div>
                     </div>
+                    <div class="row material-row">
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label">Material</label>
+                            <select name="elements-${formCount}-material" class="form-control element-material-select" id="id_elements-${formCount}-material">
+                                ${buildMaterialOptions()}
+                            </select>
+                        </div>
+                    </div>
                     <!-- Dimensions Section for Element -->
                     <div class="row mt-3">
                         <div class="col-12">
@@ -530,7 +561,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const newFormRow = formsetContainer.lastElementChild;
         const newElementTypeSelect = newFormRow.querySelector('.element-type-select');
         const newSubTypeSelect = newFormRow.querySelector('.element-subtype-select');
-        
+
         newElementTypeSelect.addEventListener('change', function() {
             updateSubtypes(this, newSubTypeSelect);
             loadExtraFieldsForRow(newFormRow);
